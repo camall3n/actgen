@@ -4,7 +4,7 @@ import logging
 import gym
 from tqdm import tqdm
 
-from .randomagent import RandomAgent
+from .agents import RandomAgent
 from . import utils
 from .utils import Experience
 from . import wrappers as wrap
