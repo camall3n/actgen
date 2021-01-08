@@ -2,6 +2,7 @@ import gym
 import numpy as np
 import torch
 
+
 class TorchSpace(gym.Space):
     def __init__(self, space):
         self._space = space
@@ -29,6 +30,7 @@ class TorchSpace(gym.Space):
     def seed(self, seed=None):
         return self._space.seed(seed)
 
+
 class TorchInterface(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -46,6 +48,7 @@ class TorchInterface(gym.Wrapper):
         reward = torch.as_tensor(reward, dtype=self.action_space.dtype)
         done = torch.as_tensor(done)
         return state, reward, done, info
+
 
 def test_torch_interface():
     env = gym.make('CartPole-v0')
@@ -67,6 +70,7 @@ def test_torch_interface():
     assert s.dtype == S.dtype
     assert isinstance(r, torch.Tensor)
     assert done.dtype == torch.bool
+
 
 if __name__ == "__main__":
     test_torch_interface()

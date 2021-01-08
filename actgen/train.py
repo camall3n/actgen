@@ -11,6 +11,7 @@ from . import wrappers as wrap
 
 logging.basicConfig(level=logging.INFO)
 
+
 class Trial:
     def __init__(self):
         args = self.parse_args()
@@ -99,6 +100,7 @@ class Trial:
             self.run_episode(episode)
             self.post_episode(episode)
         self.teardown()
+
 
 if __name__ == "__main__":
     trial = Trial()

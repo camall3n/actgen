@@ -1,5 +1,6 @@
 import gym
 
+
 class FixedDurationHack(gym.Wrapper):
     """
     Description:
