@@ -13,27 +13,33 @@ class DuplicateActions(gym.Wrapper):
                             in the order of (L1, R1, L2, R2, L3, R3)
         """
         super(DuplicateActions, self).__init__(env)
-        self.n_dup = n_dup
-        self.num_actions = n_dup * env.action_space.n
-        self.action_space = gym.spaces.Discrete(self.num_actions)
-        self.observation_space = env.observation_space
-        self.env = env
-        self._max_episode_steps = env._max_episode_steps
+        self.action_space = gym.spaces.Discrete(n_dup * env.action_space.n)
 
     def step(self, action):
         """
         :param action: a number, in range (0, n_dup)
         :return: (next_state, reward, done, info)
         """
-        original_a = action % self.env.action_space.n  # the corresponding original action of the original env
-        return self.env.step(original_a)
+        if action in self.env.action_space:
+            original_a = action % self.env.action_space.n  # the corresponding original action of the original env
+            return self.env.step(original_a)
+        else:
+            raise Exception("trying to take action not in action space")
 
 
 def test_duplicat_action_env():
-    da = DuplicateActions(gym.make("CartPole-v0"), 2)
-    print(da.action_space.n)
-    print(da.action_space.sample())
-    print(da.observation_space)
+    da = DuplicateActions(gym.make("CartPole-v0"), 2)  # env with 4 actions
+
+    assert 5 not in da.action_space
+    assert 1 in da.action_space
+
+    assert da.action_space == gym.spaces.Discrete(4)
+
+    assert da.action_space.n == 4
+
+    assert 1 <= da.action_space.sample() <= 4
+
+    assert da.observation_space == gym.make("CartPole-v0").observation_space
 
 
 if __name__ == '__main__':
