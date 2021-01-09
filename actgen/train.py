@@ -68,7 +68,7 @@ class Trial:
             sp, r, done, _ = self.env.step(a)
             t = t + 1
             terminal = False if t == self.env.unwrapped._max_episode_steps else done
-            self.agent.store(Experience(s, a, r, terminal, sp))
+            self.agent.store(Experience(s, a, r, sp, terminal))
             s = sp
 
     def post_episode(self, episode):
@@ -100,6 +100,11 @@ class Trial:
             self.run_episode(episode)
             self.post_episode(episode)
         self.teardown()
+
+
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# net.to(device)
+# TODO:
 
 
 if __name__ == "__main__":
