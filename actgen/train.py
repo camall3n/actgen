@@ -53,7 +53,7 @@ class Trial:
         env = wrap.FixedDurationHack(env)
         env = wrap.TorchInterface(env)
         self.env = env
-        self.agent = RandomAgent(env.action_space)
+        self.agent = DQNAgent(self.env.observation_space.n, self.env.action_space.n, seed=self.params['seed'])
 
     def teardown(self):
         pass
@@ -100,11 +100,6 @@ class Trial:
             self.run_episode(episode)
             self.post_episode(episode)
         self.teardown()
-
-
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# net.to(device)
-# TODO:
 
 
 if __name__ == "__main__":
