@@ -7,12 +7,13 @@ from collections import deque
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.autograd.set_detect_anomaly(True)
 
 
 class DQNAgent:
     def __init__(self,
-                 obser_space,
-                 action_space,
+                 obser_space: int,
+                 action_space: int,
                  seed=0,
                  batch_size=32,
                  buffer_size=500,
@@ -29,8 +30,8 @@ class DQNAgent:
         self.exploration_decay = exploration_decay
         self.gamma = reward_discount
         self.tau = soft_update_factor
-        self.q = DQN(obser_space, action_space, seed).to(device)
-        self.q_target = DQN(obser_space, action_space, seed).to(device)
+        self.q = DQN(obser_space, action_space, seed=seed).to(device)
+        self.q_target = DQN(obser_space, action_space, seed=seed).to(device)
         self.q_optim = torch.optim.Adam(self.q.parameters(), lr=0.001)
         self.q_target_optim = torch.optim.Adam(self.q.parameters(), lr=0.001)
         self.loss = nn.MSELoss()
@@ -38,11 +39,14 @@ class DQNAgent:
     def act(self, state, is_testing=False):
         """
         given a state, the agent chooses one of the actions from the action space
-        :param state: a tensor representing the state
+        :param state: a 1-d tensor or 1-d np.ndarray representing the state
         :param is_testing: whether during train of test
         :return: an integer in range [1, action_space.n], representing one action
         """
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        if type(state) == np.ndarray:
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        else:
+            state = state.unsqueeze(0).to(device)
 
         self.q.eval()
         with torch.no_grad():
@@ -51,14 +55,14 @@ class DQNAgent:
 
         # when testing, choose the greedy action
         if is_testing:
-            return np.argmax(q_values) + 1  # + 1 because action_space starts index at 1
+            return torch.argmax(q_values).item() + 1  # + 1 because action_space starts index at 1
 
         # when training, choose the e-greedy action
         else:
             if np.random.randn() < self.exploration_rate:
-                return random.randrange(self.action_space)
+                return random.randint(1, self.action_space)
             else:
-                return np.argmax(q_values) + 1
+                return torch.argmax(q_values).item() + 1
 
     def store(self, experience):
         """
@@ -71,7 +75,7 @@ class DQNAgent:
         """
         this function is used in self.update()
         handles experience replay. this samples a batch from the buffer to train on
-        :returns (s, a, r, terminal, sp), each of which is a list of length batch_size if the buffer is large enough
+        :returns (s, a, r, terminal, sp), each of which is a tensor of length batch_size if the buffer is large enough
                 else the length is the buffer list length
         """
         import random
@@ -85,10 +89,10 @@ class DQNAgent:
             states, actions_taken, rewards, sp, terminals = list(zip(*experience_pairs))
 
         states = torch.from_numpy(np.array(states)).float().to(device)
-        actions_taken = torch.from_numpy(np.array(actions_taken)).float().to(device)
+        actions_taken = torch.from_numpy(np.array(actions_taken)).to(device)
         rewards = torch.from_numpy(np.array(rewards)).float().to(device)
         sp = torch.from_numpy(np.array(sp)).float().to(device)
-        terminals = torch.from_numpy(np.array(terminals)).float().to(device)
+        terminals = torch.from_numpy(np.array(terminals)).to(device)
 
         return states, actions_taken, rewards, sp, terminals
 
@@ -109,16 +113,18 @@ class DQNAgent:
             if terminal:
                 q_update.append(rewards[i])
             else:
-                q_update.append(rewards[i] + self.gamma * np.max(self.q_target.forward(sp[i])))
+                next_state = torch.unsqueeze(torch.tensor(sp[i]), dim=0)
+                q_update.append(rewards[i] + self.gamma * torch.max(self.q_target.forward(next_state)))
+        q_update = torch.tensor(q_update)
 
         # q values as predicted by the q network
         self.q.eval()
         q_values = self.q.forward(states)  # (batch_sz, action_space)
 
         # target q values we want to hit
-        target_q_values = q_values
+        target_q_values = q_values.clone()
         for i, q in enumerate(q_update):
-            target_q_values[i][actions[i]] = q
+            target_q_values[i][actions[i].item()] = q
 
         # train the q network
         self.q.train()
@@ -151,8 +157,8 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(obser_space, h1)
-        seed.fc2 = nn.Linear(h1, h2)
-        seed.fc3 = nn.Linear(h2, act_space)
+        self.fc2 = nn.Linear(h1, h2)
+        self.fc3 = nn.Linear(h2, act_space)
         self.dropout = nn.Dropout(p=0.1)
         self.softmax = nn.Softmax(dim=-1)
 
@@ -165,7 +171,7 @@ class DQN(nn.Module):
         x = self.dropout(F.relu(self.fc1(x)))
         x = self.dropout(F.relu(self.fc2(x)))
         x = self.softmax(self.fc3(x))
-        assert x.size == (batch_sz, -1)
+        assert x.size(0) == batch_sz
         return x
 
 
@@ -181,9 +187,57 @@ def test_unpack():
 
 
 def test_dqn():
-    net = DQN(3, 5)
+    net = DQN(obser_space=3, act_space=5, seed=0).to(device)
+
+    x = torch.rand((20, 3)).to(device)
+    y = net.forward(x)
+
+    assert y.size(0) == 20
+    assert y.size(1) == 5
+
+
+def test_dqn_agent():
+    from ..utils import Experience
+    agent = DQNAgent(obser_space=3, action_space=5, batch_size=4)
+
+    # test act()
+    state = torch.rand((3,)).to(device)
+    a1 = agent.act(state, is_testing=False)
+    a2 = agent.act(state, is_testing=True)
+    assert 1 <= a1 <= 5
+    assert 1 <= a2 <= 5
+
+    # test store()
+    assert len(agent.exp_buffer) == 0
+    dummy_state = np.array([1, 2, 3])
+    dummy_action = 2
+    dummy_reward = 9.7
+    a = Experience(dummy_state, dummy_action, dummy_reward, dummy_state, False)
+    b = Experience(dummy_state, dummy_action, dummy_reward, dummy_state, True)
+    agent.store(a)
+    assert len(agent.exp_buffer) == 1
+    agent.store(b)
+    assert len(agent.exp_buffer) == 2
+    assert list(agent.exp_buffer) == [a, b]
+
+    # test exp_replay()
+    re1 = agent.exp_replay()
+    assert re1 is None
+    for _ in range(5):
+        agent.store(a)
+    states, actions, rewards, sp, terminals = agent.exp_replay()
+    assert len(states) == 4
+    assert len(actions) == 4
+    assert len(rewards) == 4
+    assert len(sp) == 4
+    assert len(terminals) == 4
+
+    # test update()
+    loss = agent.update()
+    assert loss.item() > 0
 
 
 if __name__ == '__main__':
     test_unpack()
     test_dqn()
+    test_dqn_agent()
