@@ -11,6 +11,7 @@ from . import wrappers as wrap
 
 logging.basicConfig(level=logging.INFO)
 
+
 class Trial:
     def __init__(self):
         args = self.parse_args()
@@ -22,6 +23,8 @@ class Trial:
         # yapf: disable
         parser.add_argument('--env', type=str, default='CartPole-v0',
                             help='Which gym environment to use')
+        parser.add_argument('--duplicate', '-d', type=int, default=5,
+                            help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
@@ -39,12 +42,14 @@ class Trial:
         params = utils.load_hyperparams(args.hyperparams)
         params['env_name'] = args.env
         params['seed'] = args.seed
+        params['duplicate'] = args.duplicate
         for arg_name, arg_value in args.other_args:
             utils.update_param(params, arg_name, arg_value)
         return params
 
     def setup(self):
         env = gym.make(self.params['env_name'])
+        env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.FixedDurationHack(env)
         env = wrap.TorchInterface(env)
         self.env = env
@@ -62,8 +67,8 @@ class Trial:
             a = self.agent.act(s)
             sp, r, done, _ = self.env.step(a)
             t = t + 1
-            done_p = False if t == self.env.unwrapped._max_episode_steps else done
-            self.agent.store(Experience(s, a, r, done_p, sp))
+            terminal = False if t == self.env.unwrapped._max_episode_steps else done
+            self.agent.store(Experience(s, a, r, terminal, sp))
             s = sp
 
     def post_episode(self, episode):
@@ -80,7 +85,7 @@ class Trial:
         ep_scores = []
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.env.reset(), 0, False, 0
-            while done == False:
+            while not done:
                 a = self.agent.act(s, testing=True)
                 sp, r, done, _ = self.env.step(a)
                 s, G, t = sp, G + r, t + 1
@@ -95,6 +100,7 @@ class Trial:
             self.run_episode(episode)
             self.post_episode(episode)
         self.teardown()
+
 
 if __name__ == "__main__":
     trial = Trial()

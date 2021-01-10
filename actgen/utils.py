@@ -4,6 +4,7 @@ from pydoc import locate
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
+
 def load_hyperparams(filepath):
     params = dict()
     with open(filepath, newline='') as file:
@@ -12,6 +13,7 @@ def load_hyperparams(filepath):
             print(', '.join((name, value, dtype)))
             params[name] = locate(dtype)(value)
     return params
+
 
 def save_hyperparams(filepath, params):
     with open(filepath, 'w', newline='') as file:
@@ -25,6 +27,7 @@ def save_hyperparams(filepath, params):
             if type_str is not None:
                 writer.writerow(name, value, type_str)
 
+
 def update_param(params, name, value):
     if name not in params:
         raise KeyError(
@@ -32,6 +35,7 @@ def update_param(params, name, value):
     else:
         logging.info("Updating parameter '{}' to {}".format(name, value))
     params[name] = type(params[name])(value)
+
 
 def every_n_times(n, count, callback, *args, final_count=None):
     if (count % n == 0) or (final_count is not None and (count == final_count)):
