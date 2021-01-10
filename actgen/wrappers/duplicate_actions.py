@@ -37,7 +37,7 @@ def test_duplicate_action_env():
 
     assert env.action_space.n == 4
 
-    assert 1 <= env.action_space.sample() <= 4
+    assert 0 <= env.action_space.sample() < 4
 
     assert env.observation_space == gym.make("CartPole-v0").observation_space
 
