@@ -27,7 +27,7 @@ class DuplicateActions(gym.Wrapper):
             raise RuntimeError("trying to take action not in action space")
 
 
-def test_duplicat_action_env():
+def test_duplicate_action_env():
     env = DuplicateActions(gym.make("CartPole-v0"), 2)  # env with 4 actions
 
     assert 5 not in env.action_space
@@ -43,4 +43,4 @@ def test_duplicat_action_env():
 
 
 if __name__ == '__main__':
-    test_duplicat_action_env()
+    test_duplicate_action_env()
