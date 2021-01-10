@@ -53,7 +53,7 @@ class Trial:
         env = wrap.FixedDurationHack(env)
         env = wrap.TorchInterface(env)
         self.env = env
-        self.agent = DQNAgent(self.env.observation_space.n, self.env.action_space.n, seed=self.params['seed'])
+        self.agent = DQNAgent(self.env.observation_space.shape[0], self.env.action_space.n, seed=self.params['seed'])
 
     def teardown(self):
         pass
@@ -76,8 +76,13 @@ class Trial:
         loss = []
         for count in tqdm(range(self.params['updates_per_episode'])):
             temp = self.agent.update()
-            loss.append(temp)
-        loss = sum(loss)/len(loss)
+            if temp is not None:
+                loss.append(temp)
+        try:
+            loss = sum(loss)/len(loss)
+        except ZeroDivisionError:
+            print("not enough experience yet")
+            pass
 
         utils.every_n_times(self.params['eval_period'], episode, self.evaluate, episode)
 

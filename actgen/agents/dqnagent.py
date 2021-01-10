@@ -36,17 +36,17 @@ class DQNAgent:
         self.q_target_optim = torch.optim.Adam(self.q.parameters(), lr=0.001)
         self.loss = nn.MSELoss()
 
-    def act(self, state, is_testing=False):
+    def act(self, state, testing=False):
         """
         given a state, the agent chooses one of the actions from the action space
         :param state: a 1-d tensor or 1-d np.ndarray representing the state
-        :param is_testing: whether during train of test
+        :param testing: whether during train of test
         :return: an integer in range [1, action_space.n], representing one action
         """
         if type(state) == np.ndarray:
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
         else:
-            state = state.unsqueeze(0).to(device)
+            state = state.float().unsqueeze(0).to(device)
 
         self.q.eval()
         with torch.no_grad():
@@ -54,15 +54,15 @@ class DQNAgent:
         self.q.train()
 
         # when testing, choose the greedy action
-        if is_testing:
-            return torch.argmax(q_values).item() + 1  # + 1 because action_space starts index at 1
+        if testing:
+            return torch.argmax(q_values).item()
 
         # when training, choose the e-greedy action
         else:
             if np.random.randn() < self.exploration_rate:
-                return random.randint(1, self.action_space)
+                return random.randrange(self.action_space)
             else:
-                return torch.argmax(q_values).item() + 1
+                return torch.argmax(q_values).item()
 
     def store(self, experience):
         """
@@ -88,11 +88,12 @@ class DQNAgent:
             experience_pairs = random.sample(self.exp_buffer, self.batch_size)
             states, actions_taken, rewards, sp, terminals = list(zip(*experience_pairs))
 
-        states = torch.from_numpy(np.array(states)).float().to(device)
+        # make all into tensors of the right shape
+        states = torch.cat(states).view(self.batch_size, -1).to(device, dtype=torch.float32)
         actions_taken = torch.from_numpy(np.array(actions_taken)).to(device)
-        rewards = torch.from_numpy(np.array(rewards)).float().to(device)
-        sp = torch.from_numpy(np.array(sp)).float().to(device)
-        terminals = torch.from_numpy(np.array(terminals)).to(device)
+        rewards = torch.tensor(rewards).to(device, dtype=torch.float32)
+        sp = torch.cat(sp).view(self.batch_size, -1).to(device, dtype=torch.float32)
+        terminals = torch.tensor(terminals).to(device)
 
         return states, actions_taken, rewards, sp, terminals
 
@@ -102,9 +103,10 @@ class DQNAgent:
         also update the exploration rate
         :return: the loss of a batch
         """
-        states, actions, rewards, sp, terminals = self.exp_replay()  # each is of size (batch_sz, -1)
-        if states is None:
+        replay = self.exp_replay()
+        if replay is None:
             return
+        states, actions, rewards, sp, terminals = replay  # each is of size (batch_sz, -1)
 
         # get the bootstrapped q_update
         self.q_target.eval()
@@ -113,7 +115,7 @@ class DQNAgent:
             if terminal:
                 q_update.append(rewards[i])
             else:
-                next_state = torch.unsqueeze(torch.tensor(sp[i]), dim=0)
+                next_state = torch.unsqueeze(sp[i], dim=0)
                 q_update.append(rewards[i] + self.gamma * torch.max(self.q_target.forward(next_state)))
         q_update = torch.tensor(q_update)
 
@@ -202,14 +204,14 @@ def test_dqn_agent():
 
     # test act()
     state = torch.rand((3,)).to(device)
-    a1 = agent.act(state, is_testing=False)
-    a2 = agent.act(state, is_testing=True)
-    assert 1 <= a1 <= 5
-    assert 1 <= a2 <= 5
+    a1 = agent.act(state, testing=False)
+    a2 = agent.act(state, testing=True)
+    assert 0 <= a1 <= 4
+    assert 0 <= a2 <= 4
 
     # test store()
     assert len(agent.exp_buffer) == 0
-    dummy_state = np.array([1, 2, 3])
+    dummy_state = torch.tensor([1, 2, 3])
     dummy_action = 2
     dummy_reward = 9.7
     a = Experience(dummy_state, dummy_action, dummy_reward, dummy_state, False)
