@@ -20,11 +20,10 @@ class DuplicateActions(gym.Wrapper):
         :param action: a number, in range (0, n_dup)
         :return: (next_state, reward, done, info)
         """
-        if action in self.env.action_space:
-            original_a = action % self.env.action_space.n  # the corresponding original action of the original env
-            return self.env.step(original_a)
-        else:
+        if action not in self.action_space:
             raise RuntimeError("trying to take action not in action space")
+        original_a = action % self.env.action_space.n  # the corresponding original action of the original env
+        return self.env.step(original_a)
 
 
 def test_duplicate_action_env():

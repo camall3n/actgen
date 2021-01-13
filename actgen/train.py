@@ -1,13 +1,15 @@
 import argparse
 import logging
 
+import random
 import gym
+import seeding
 from tqdm import tqdm
 
-from .agents import RandomAgent
 from . import utils
-from .utils import Experience
 from . import wrappers as wrap
+from .agents import RandomAgent
+from .utils import Experience
 
 logging.basicConfig(level=logging.INFO)
 
@@ -48,10 +50,12 @@ class Trial:
         return params
 
     def setup(self):
+        seeding.seed(0, random)
         env = gym.make(self.params['env_name'])
-        env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.FixedDurationHack(env)
+        env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.TorchInterface(env)
+        seeding.seed(0, gym, env)
         self.env = env
         self.agent = RandomAgent(env.action_space)
 
@@ -102,6 +106,10 @@ class Trial:
         self.teardown()
 
 
-if __name__ == "__main__":
+def main():
     trial = Trial()
     trial.run()
+
+
+if __name__ == "__main__":
+    main()
