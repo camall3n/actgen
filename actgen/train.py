@@ -4,10 +4,10 @@ import logging
 import gym
 from tqdm import tqdm
 
-from .agents import RandomAgent
 from . import utils
-from .utils import Experience
 from . import wrappers as wrap
+from .agents import RandomAgent
+from .utils import Experience
 
 logging.basicConfig(level=logging.INFO)
 
