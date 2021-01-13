@@ -10,7 +10,6 @@ def load_hyperparams(filepath):
     with open(filepath, newline='') as file:
         reader = csv.reader(file, delimiter=',', quotechar='|')
         for name, value, dtype in reader:
-            print(', '.join((name, value, dtype)))
             params[name] = locate(dtype)(value)
     return params
 
