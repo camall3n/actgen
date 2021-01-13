@@ -2,6 +2,7 @@ import argparse
 import logging
 
 import gym
+import seeding
 from tqdm import tqdm
 
 from . import utils
@@ -102,6 +103,10 @@ class Trial:
         self.teardown()
 
 
-if __name__ == "__main__":
+def main():
     trial = Trial()
     trial.run()
+
+
+if __name__ == "__main__":
+    main()
