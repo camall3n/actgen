@@ -49,8 +49,8 @@ class Trial:
 
     def setup(self):
         env = gym.make(self.params['env_name'])
-        env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.FixedDurationHack(env)
+        env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.TorchInterface(env)
         self.env = env
         self.agent = RandomAgent(env.action_space)
