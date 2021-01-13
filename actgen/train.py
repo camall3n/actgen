@@ -1,6 +1,7 @@
 import argparse
 import logging
 
+import random
 import gym
 import seeding
 from tqdm import tqdm
@@ -49,10 +50,12 @@ class Trial:
         return params
 
     def setup(self):
+        seeding.seed(0, random)
         env = gym.make(self.params['env_name'])
         env = wrap.FixedDurationHack(env)
         env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.TorchInterface(env)
+        seeding.seed(0, gym, env)
         self.env = env
         self.agent = RandomAgent(env.action_space)
 
