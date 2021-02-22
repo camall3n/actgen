@@ -47,6 +47,8 @@ class Network(torch.nn.Module):
         print(s)
 
     def save(self, name, model_dir, is_best=False):
+        # For a more detailed version that also saves optimizers, see here:
+        # https://towardsdatascience.com/how-to-save-and-load-a-model-in-pytorch-with-a-complete-example-c2920e617dee
         os.makedirs(model_dir, exist_ok=True)
         model_file = os.path.join(model_dir, '{}_latest.pytorch'.format(name))
         torch.save(self.state_dict(), model_file)
@@ -74,6 +76,21 @@ class Network(torch.nn.Module):
                 param.requires_grad = True
             self.frozen = False
 
+    def hard_copy_from(self, other):
+        self.load_state_dict(other.state_dict())
+
+    def soft_copy_from(self, other, tau=0.1):
+        """
+        Soft update current network towards weights of other network.
+        θ_dest = τ * θ_src + (1 - τ) * θ_dest
+
+        Args:
+            local_model (nn.Module): weights will be copied from
+            dest_model (nn.Module): weights will be copied to
+            tau (float): interpolation parameter - usually small eg 0.0001
+        """
+        for theta_dest, theta_src in zip(self.parameters(), other.parameters()):
+            theta_dest.data.copy_(tau * theta_src.data + (1.0 - tau) * theta_dest.data)
 
 class Sequential(torch.nn.Sequential, Network):
     pass
