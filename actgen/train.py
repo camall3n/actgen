@@ -26,8 +26,9 @@ class Trial:
             self.params['max_env_steps'] = 1000
             self.params['eval_every_n_steps'] = 100
             self.params['epsilon_decay_period'] = 250
-            self.params['n_eval_episodes'] = 2
-            self.params['replay_warmup_steps'] = 50
+            self.params['epsilon_final'] = 0
+            self.params['n_eval_episodes'] = 10
+            self.params['replay_warmup_steps'] = 0
         self.setup()
 
     def parse_args(self):
@@ -81,6 +82,9 @@ class Trial:
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
             self.agent = DQNAgent(env.observation_space, env.action_space, self.params)
+        # load saved model during testing
+        if self.params['test']:
+            self.agent.q.load("results/qnet_best.pytorch")
         self.best_score = -np.inf
 
     def teardown(self):
@@ -99,29 +103,33 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s)
+                a = self.agent.act(s, testing=self.params['test'])
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
         avg_episode_score = (sum(ep_scores)/len(ep_scores)).item()
         logging.info("Evaluation: step {}, average score {}".format(
             step, avg_episode_score))
-        if avg_episode_score > self.best_score:
-            self.best_score = avg_episode_score
-            is_best = True
-        else:
-            is_best = False
-        self.agent.save(is_best)
+        # save the models during training
+        if not self.params['test']:
+            if avg_episode_score > self.best_score:
+                self.best_score = avg_episode_score
+                is_best = True
+            else:
+                is_best = False
+            self.agent.save(is_best)
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
         for step in tqdm(range(self.params['max_env_steps'])):
-            a = self.agent.act(s)
+            a = self.agent.act(s, testing=self.params['test'])
             sp, r, done, _ = self.env.step(a)
             t = t + 1
-            terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done
-            self.agent.store(Experience(s, a, r, sp, terminal))
-            loss = self.update_agent()
+            # update the agent when training
+            if not self.params['test']:
+                terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done
+                self.agent.store(Experience(s, a, r, sp, terminal))
+                loss = self.update_agent()
             if done:
                 s = self.env.reset()
             else:
@@ -133,6 +141,7 @@ class Trial:
 def main(test=False):
     trial = Trial(test=test)
     trial.run()
+
 
 if __name__ == "__main__":
     main()
