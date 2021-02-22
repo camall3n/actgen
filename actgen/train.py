@@ -21,8 +21,8 @@ class Trial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
-        if not self.params['test'] and test:
-            self.params['test'] = test
+        if self.params['test'] or test:
+            self.params['test'] = True
             self.params['max_env_steps'] = 1000
             self.params['eval_every_n_steps'] = 100
             self.params['epsilon_decay_period'] = 250
