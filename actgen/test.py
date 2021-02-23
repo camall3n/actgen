@@ -20,18 +20,12 @@ class Trial:
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
         # hyper params to set up testing
-        self.params['max_env_steps'] = 10000
-        self.params['eval_every_n_steps'] = 100
         self.params['epsilon_final'] = 0
-        self.params['n_eval_episodes'] = 10
+        self.params['n_eval_episodes'] = 100
         self.params['replay_warmup_steps'] = 0
+        self.params['epsilon_decay_period'] = 0
         if self.params['test'] or test:
             self.params['test'] = True
-            self.params['max_env_steps'] = 1000
-            self.params['eval_every_n_steps'] = 100
-            self.params['epsilon_decay_period'] = 250
-            self.params['n_eval_episodes'] = 2
-            self.params['replay_warmup_steps'] = 50
         self.setup()
 
     def parse_args(self):
@@ -78,13 +72,12 @@ class Trial:
         seeding.seed(1000+self.params['seed'], gym, test_env)
         self.test_env = test_env
 
-        if self.params['agent'] == 'random':
-            self.agent = RandomAgent(test_env.observation_space, test_env.action_space)
-        elif self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        assert self.params['agent'] == 'dqn'
+        self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
-        self.agent.q.load("results/qnet_best.pytorch")
-        self.best_score = -np.inf
+        if not self.params['test']:
+            self.agent.q.load("results/qnet_best.pytorch")
+
 
     def teardown(self):
         pass
@@ -102,19 +95,10 @@ class Trial:
         logging.info("Evaluation: step {}, average score {}".format(
             step, avg_episode_score))
 
-    def run(self):
-        """
-        evaluate a loaded model in the test_env
-        :return:
-        """
-        for step in tqdm(range(self.params['max_env_steps'])):
-            utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
-        self.teardown()
-
 
 def main(test=False):
     trial = Trial(test=test)
-    trial.run()
+    trial.evaluate(0)
 
 
 if __name__ == "__main__":
