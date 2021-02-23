@@ -1,5 +1,4 @@
 import argparse
-import copy
 import logging
 import random
 
@@ -20,14 +19,19 @@ class Trial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
+        # hyper params to set up testing
+        self.params['max_env_steps'] = 10000
+        self.params['eval_every_n_steps'] = 100
+        self.params['epsilon_final'] = 0
+        self.params['n_eval_episodes'] = 10
+        self.params['replay_warmup_steps'] = 0
         if self.params['test'] or test:
             self.params['test'] = True
-            self.params['max_env_steps'] = 10000
+            self.params['max_env_steps'] = 1000
             self.params['eval_every_n_steps'] = 100
             self.params['epsilon_decay_period'] = 250
-            self.params['epsilon_final'] = 0
-            self.params['n_eval_episodes'] = 10
-            self.params['replay_warmup_steps'] = 0
+            self.params['n_eval_episodes'] = 2
+            self.params['replay_warmup_steps'] = 50
         self.setup()
 
     def parse_args(self):
@@ -67,23 +71,19 @@ class Trial:
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = gym.make(self.params['env_name'])
-        env = wrap.FixedDurationHack(env)
-        env = wrap.DuplicateActions(env, self.params['duplicate'])
-        env = wrap.TorchInterface(env)
-        test_env = copy.deepcopy(env)
-        seeding.seed(self.params['seed'], gym, env)
+        test_env = gym.make(self.params['env_name'])
+        test_env = wrap.FixedDurationHack(test_env)
+        test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
+        test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000+self.params['seed'], gym, test_env)
-        self.env = env
         self.test_env = test_env
 
         if self.params['agent'] == 'random':
-            self.agent = RandomAgent(env.observation_space, env.action_space)
+            self.agent = RandomAgent(test_env.observation_space, test_env.action_space)
         elif self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(env.observation_space, env.action_space, self.params)
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
-        if self.params['test']:
-            self.agent.q.load("results/qnet_best.pytorch")
+        self.agent.q.load("results/qnet_best.pytorch")
         self.best_score = -np.inf
 
     def teardown(self):
@@ -94,7 +94,7 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s, testing=self.params['test'])
+                a = self.agent.act(s, testing=True)
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
@@ -104,23 +104,15 @@ class Trial:
 
     def run(self):
         """
-        testing a loaded model in one episode
+        evaluate a loaded model in the test_env
         :return:
         """
-        s, done, t = self.env.reset(), False, 0
         for step in tqdm(range(self.params['max_env_steps'])):
-            a = self.agent.act(s, testing=self.params['test'])
-            sp, r, done, _ = self.env.step(a)
-            t = t + 1
-            if done:
-                s = self.env.reset()
-            else:
-                s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
         self.teardown()
 
 
-def main(test=True):
+def main(test=False):
     trial = Trial(test=test)
     trial.run()
 
