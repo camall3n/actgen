@@ -19,11 +19,6 @@ class Trial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
-        # hyper params to set up testing
-        self.params['epsilon_final'] = 0
-        self.params['n_eval_episodes'] = 100
-        self.params['replay_warmup_steps'] = 0
-        self.params['epsilon_decay_period'] = 0
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
@@ -42,8 +37,16 @@ class Trial:
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
+        parser.add_argument('--saved_model', type=str, default='results/qnet_best.pytorch',
+                            help='Path to a saved model that"s fully trained')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
+        parser.add_argument('--num_update', '-n', type=int, default=5,
+                            help='Number of times to update a particular action q value')
+        parser.add_argument('--delta_update', '-u', type=float, default=10.0,
+                            help='increase the q value by this much for every update applied')
+        parser.add_argument('--change_percentage_thresh', '-p', type=float, default=0.10,
+                            help='only changes past this percentage are considered when computing the metrics')
         args, unknown = parser.parse_known_args()
         other_args = {
             (remove_prefix(key, '--'), val)
@@ -76,7 +79,7 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
-            self.agent.q.load("results/qnet_best.pytorch")
+            self.agent.q.load(self.params['saved_model'])
 
     def teardown(self):
         pass
@@ -131,7 +134,6 @@ class Trial:
         plt.title('action {}'.format(action_idx))
         plt.xlabel('{} different actions'.format(self.test_env.action_space.n))
         plt.ylabel('q(s,a)')
-        # plt.legend()
 
     def direction_of_change(self, old_values, new_values, action, thresh):
         """
@@ -151,21 +153,23 @@ class Trial:
             number of different actions that are updated in the same direction
             number of different actions that are updated in the different direction
         """
+        # identify similar & different actions
+        num_total_actions = int(self.test_env.action_space.n)
+        num_different_actions = int(num_total_actions / self.params['duplicate'])
+        similar_actions = range(int(action % num_different_actions), num_total_actions, num_different_actions)
+        diff_actions = np.delete(range(num_total_actions), similar_actions)
+
+        # get q values for similar & different actions
         difference = new_values - old_values
-        if action % 2 == 0:
-            similar_actions = range(0, self.test_env.action_space.n, 2)
-            diff_actions = range(1, self.test_env.action_space.n, 2)
-        else:
-            similar_actions = range(1, self.test_env.action_space.n, 2)
-            diff_actions = range(0, self.test_env.action_space.n, 2)
-        # collect q values for different/similar actions
         similar_actions_values = np.take(difference, similar_actions, axis=-1)
         diff_actions_values = np.take(difference, diff_actions, axis=-1)
-        assert similar_actions_values.shape == (len(difference), int(self.test_env.action_space.n / 2))
-        assert diff_actions_values.shape == (len(difference), int(self.test_env.action_space.n / 2))
+        assert similar_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
+        assert diff_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
+
         # apply the thresh hold, ignore small changes
         similar_actions_values = np.where(abs(similar_actions_values) > thresh, similar_actions_values, 0)
         diff_actions_values = np.where(abs(diff_actions_values) > thresh, diff_actions_values, 0)
+
         # check if in right direction
         num_same_dir_similar = sum(np.mean(similar_actions_values, axis=0) > 0) - 1
         num_diff_dir_similar = sum(np.mean(similar_actions_values, axis=0) < 0)
@@ -176,15 +180,20 @@ class Trial:
 
 def main(test=False):
     # hyper parameters for plotting
-    num_updates = 5  # number of consecutive updates
-    delta_update = 10  # add this much to the original q value each iteration of the update
-    change_thresh = 0.01  # only changes past this threshold are considered a change
+    bogy_trial = Trial()
+    num_updates = bogy_trial.params['num_update']  # number of consecutive updates
+    delta_update = bogy_trial.params['delta_update']  # add this to the original q value each iteration of the update
+    change_percentage_thresh = bogy_trial.params['change_percentage_thresh']
+    num_total_actions = int(bogy_trial.test_env.action_space.n)
+    num_different_actions = int(num_total_actions / bogy_trial.params['duplicate'])
+    # only changes past this percentage threshold are considered a change.
+    # this percentage is the percentage of the maximum increase the q value experienced.
 
     # prepare to plot
     plt.figure()
 
     # figure out what are the possible actions
-    actions = range(Trial().test_env.action_space.n)
+    actions = range(num_total_actions)
 
     # updates for each action
     for a in actions:
@@ -195,18 +204,23 @@ def main(test=False):
 
         base_update_value = original_q_values[a] + delta_update
         new_values = []
+        # update for a few consecutive times
         for i in range(num_updates):
             update_value = base_update_value + delta_update * i
             old_val, new_val = trial.dqn_directed_update(s, a, update_value)
             new_values.append(new_val)
             assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
+
         # plot for current action
-        plt.subplot(5, 2, a+1)
-        plt.ylim(-0.1, 0.1)
+        max_change = np.max(new_values)-original_q_values[a]
+        plt.subplot(int(num_total_actions/num_different_actions), num_different_actions, a+1)
+        plt.ylim(-1.2 * max_change, 1.2 * max_change)
         trial.plot(original_q_values, new_values, a)
+
         # get metric for current action (precision recall)
         similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
-            trial.direction_of_change(original_q_values, new_values, a, thresh=change_thresh)
+            trial.direction_of_change(original_q_values, new_values, a,
+                                      thresh=change_percentage_thresh*(max_change))
         print(f"for action {a} metrics are: {similar_act_same_dir}, {similar_act_diff_dir},"
               f" {diff_act_same_dir}, {diff_act_diff_dir}")
 
