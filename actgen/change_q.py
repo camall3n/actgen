@@ -1,8 +1,9 @@
 import argparse
 import logging
 import random
-from matplotlib import pyplot as plt
+import csv
 
+from matplotlib import pyplot as plt
 import numpy as np
 import gym
 import seeding
@@ -39,6 +40,8 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--saved_model', type=str, default='results/qnet_best.pytorch',
                             help='Path to a saved model that"s fully trained')
+        parser.add_argument('--out_file', type=str, default='results/change_q_metric.csv',
+                            help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
         parser.add_argument('--num_update', '-n', type=int, default=5,
@@ -72,7 +75,7 @@ class Trial:
         test_env = wrap.FixedDurationHack(test_env)
         test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
         test_env = wrap.TorchInterface(test_env)
-        seeding.seed(1000+self.params['seed'], gym, test_env)
+        seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
 
         assert self.params['agent'] == 'dqn'
@@ -183,14 +186,21 @@ def main(test=False):
     bogy_trial = Trial()
     num_updates = bogy_trial.params['num_update']  # number of consecutive updates
     delta_update = bogy_trial.params['delta_update']  # add this to the original q value each iteration of the update
+    # only changes past this percentage threshold are considered a change.
+    # this percentage is the percentage of the maximum increase the q value experienced.
     change_percentage_thresh = bogy_trial.params['change_percentage_thresh']
     num_total_actions = int(bogy_trial.test_env.action_space.n)
     num_different_actions = int(num_total_actions / bogy_trial.params['duplicate'])
-    # only changes past this percentage threshold are considered a change.
-    # this percentage is the percentage of the maximum increase the q value experienced.
+    out_file_path = bogy_trial.params['out_file']
 
-    # prepare to plot
+    # prepare to plot, open csv to write to
     plt.figure()
+    metrics_out_file = open(out_file_path, 'w')
+    csv_writer = csv.writer(metrics_out_file)
+    csv_writer.writerow(['number of similar actions that are updated in the same direction',
+                         'number of similar actions that are updated in the different direction',
+                         'number of different actions that are updated in the same direction',
+                         'number of different actions that are updated in the different direction'])
 
     # figure out what are the possible actions
     actions = range(num_total_actions)
@@ -212,20 +222,20 @@ def main(test=False):
             assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
 
         # plot for current action
-        max_change = np.max(new_values)-original_q_values[a]
-        plt.subplot(int(num_total_actions/num_different_actions), num_different_actions, a+1)
+        max_change = np.max(new_values) - original_q_values[a]
+        plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
         plt.ylim(-1.2 * max_change, 1.2 * max_change)
         trial.plot(original_q_values, new_values, a)
 
         # get metric for current action (precision recall)
         similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
             trial.direction_of_change(original_q_values, new_values, a,
-                                      thresh=change_percentage_thresh*(max_change))
-        print(f"for action {a} metrics are: {similar_act_same_dir}, {similar_act_diff_dir},"
-              f" {diff_act_same_dir}, {diff_act_diff_dir}")
+                                      thresh=change_percentage_thresh * max_change)
+        csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
 
-    # show plot
+    # show plot, close csv
     plt.show()
+    metrics_out_file.close()
 
 
 if __name__ == "__main__":
