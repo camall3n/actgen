@@ -12,3 +12,8 @@ pip install -r requirements.txt
 ```bash
 python3 -m actgen.train
 ```
+
+## Testing
+```bash
+python3 -m actgen.test
+```
