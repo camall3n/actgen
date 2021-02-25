@@ -27,6 +27,12 @@ def save_hyperparams(filepath, params):
                 writer.writerow(name, value, type_str)
 
 
+def remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text
+
+
 def update_param(params, name, value):
     if name not in params:
         raise KeyError(

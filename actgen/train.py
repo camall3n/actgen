@@ -48,7 +48,7 @@ class Trial:
                             help='Enable test mode for quickly checking configuration works')
         args, unknown = parser.parse_known_args()
         other_args = {
-            (remove_prefix(key, '--'), val)
+            (utils.remove_prefix(key, '--'), val)
             for (key, val) in zip(unknown[::2], unknown[1::2])
         }
         args.other_args = other_args
