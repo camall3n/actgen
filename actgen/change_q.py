@@ -23,6 +23,7 @@ class Trial:
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
+        self.optimizer = torch.optim.Adam(list(self.agent.q.parameters()), lr=self.params['learning_rate'])
 
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -102,7 +103,7 @@ class Trial:
         returns the old q(state,a) and the updated q(state, a) for all a.
         """
         self.agent.q.train()
-        self.agent.optimizer.zero_grad()
+        self.optimizer.zero_grad()
 
         old_q_values = self.agent.q(state.float())  # q(state, a) for all a
         q_target = old_q_values.clone()
@@ -110,7 +111,7 @@ class Trial:
 
         loss = torch.nn.functional.smooth_l1_loss(input=old_q_values, target=q_target)
         loss.backward()
-        self.agent.optimizer.step()
+        self.optimizer.step()
 
         self.agent.q.eval()
         new_q_values = self.agent.q(state.float())
