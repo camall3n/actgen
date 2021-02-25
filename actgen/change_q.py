@@ -52,7 +52,7 @@ class Trial:
                             help='only changes past this percentage are considered when computing the metrics')
         args, unknown = parser.parse_known_args()
         other_args = {
-            (remove_prefix(key, '--'), val)
+            (utils.remove_prefix(key, '--'), val)
             for (key, val) in zip(unknown[::2], unknown[1::2])
         }
         args.other_args = other_args
@@ -117,27 +117,6 @@ class Trial:
 
         return old_q_values.detach().numpy()[0], new_q_values.detach().numpy()[0]
 
-    def plot(self, old_values, new_values, action_idx):
-        """
-        given a set of old and new q values, plot them in a graph to compare
-        this function plots the change in q_values in one plot for one action
-
-        old_values.shape = (env.action_space.n,)
-        new_values.shape = (num_updates, env.action_space.n)
-        """
-        possible_actions = np.arange(self.test_env.action_space.n)
-
-        # plot reference line at 0
-        plt.plot(possible_actions, np.zeros_like(possible_actions), '--k')
-
-        # plot all new values
-        for i, new_val in enumerate(new_values):
-            plt.plot(possible_actions, new_val - old_values, label='iter {}'.format(i))
-
-        plt.title('action {}'.format(action_idx))
-        plt.xlabel('{} different actions'.format(self.test_env.action_space.n))
-        plt.ylabel('q(s,a)')
-
     def direction_of_change(self, old_values, new_values, action, thresh):
         """
         given a set of old and new q values, compare and see if similar/different actions were updated in
@@ -181,6 +160,29 @@ class Trial:
         return num_same_dir_similar, num_diff_dir_similar, num_same_dir_diff, num_diff_dir_diff
 
 
+def plot(old_values, new_values, action_idx):
+    """
+    given a set of old and new q values, plot them in a graph to compare
+    this function plots the change in q_values in one plot for one action
+
+    old_values.shape = (env.action_space.n,)
+    new_values.shape = (num_updates, env.action_space.n)
+    """
+    n = len(old_values)
+    possible_actions = np.arange(n)
+
+    # plot reference line at 0
+    plt.plot(possible_actions, np.zeros_like(possible_actions), '--k')
+
+    # plot all new values
+    for i, new_val in enumerate(new_values):
+        plt.plot(possible_actions, new_val - old_values, label='iter {}'.format(i))
+
+    plt.title('action {}'.format(action_idx))
+    plt.xlabel('{} different actions'.format(n))
+    plt.ylabel(r'$\Delta$q(s,a)')
+
+
 def main(test=False):
     # hyper parameters for plotting
     bogy_trial = Trial()
@@ -212,11 +214,10 @@ def main(test=False):
         s = trial.test_env.reset()  # one starting state
         original_q_values = trial.original_q_values(s)  # q(s,a) for all a in actions
 
-        base_update_value = original_q_values[a] + delta_update
+        update_value = original_q_values[a] + delta_update
         new_values = []
         # update for a few consecutive times
         for i in range(num_updates):
-            update_value = base_update_value + delta_update * i
             old_val, new_val = trial.dqn_directed_update(s, a, update_value)
             new_values.append(new_val)
             assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
@@ -225,7 +226,7 @@ def main(test=False):
         max_change = np.max(new_values) - original_q_values[a]
         plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
         plt.ylim(-1.2 * max_change, 1.2 * max_change)
-        trial.plot(original_q_values, new_values, a)
+        plot(original_q_values, new_values, a)
 
         # get metric for current action (precision recall)
         similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
