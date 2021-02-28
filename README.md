@@ -13,6 +13,10 @@ pip install -r requirements.txt
 python3 -m actgen.train
 ```
 
+## Experiment 1: update q(s,a) and observe q(s, \tilde(a))
+```bash
+python3 -m actgen.change_q
+```
 ## Testing
 ```bash
 python3 -m actgen.test

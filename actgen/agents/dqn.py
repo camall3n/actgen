@@ -4,6 +4,7 @@ import torch
 from ..nnutils import Network, Sequential, Reshape, extract
 from .replaymemory import ReplayMemory
 
+
 class QNet(Network):
     def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer):
         super().__init__()
