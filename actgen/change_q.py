@@ -197,7 +197,8 @@ def main(test=False):
     out_file_path = bogy_trial.params['out_file']
 
     # prepare to plot, open csv to write to
-    plt.figure()
+    if not test:
+        plt.figure()
     metrics_out_file = open(out_file_path, 'w')
     csv_writer = csv.writer(metrics_out_file)
     csv_writer.writerow(['number of similar actions that are updated in the same direction',
@@ -236,7 +237,8 @@ def main(test=False):
         csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
 
     # show plot, close csv
-    plt.show()
+    if not test:
+        plt.show()
     metrics_out_file.close()
 
 
