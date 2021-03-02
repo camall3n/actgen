@@ -149,7 +149,8 @@ class Trial:
         similar_actions_values = np.take(difference, similar_actions, axis=-1)
         diff_actions_values = np.take(difference, diff_actions, axis=-1)
         assert similar_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
-        assert diff_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
+        assert diff_actions_values.shape == \
+               (len(difference), num_total_actions - int(num_total_actions / num_different_actions))
 
         # apply the thresh hold, ignore small changes
         similar_actions_values = np.where(abs(similar_actions_values) > thresh, similar_actions_values, 0)
