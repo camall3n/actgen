@@ -67,6 +67,8 @@ class Trial:
         seeding.seed(0, random, torch, np)
         test_env = gym.make(self.params['env_name'])
         test_env = wrap.FixedDurationHack(test_env)
+        if isinstance(test_env.action_space, gym.spaces.Box):
+            test_env = wrap.DiscreteBox(test_env)
         test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
         test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000+self.params['seed'], gym, test_env)
