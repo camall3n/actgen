@@ -28,7 +28,7 @@ class Trial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='CartPole-v0',
+        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random'],
@@ -37,7 +37,7 @@ class Trial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
                             help='Path to hyperparameters csv file')
         parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
                             help='Path to a saved model that"s fully trained')
