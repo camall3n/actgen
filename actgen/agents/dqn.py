@@ -53,8 +53,8 @@ class DQNAgent():
         params = list(self.q.parameters())
         self.optimizer = torch.optim.Adam(params, lr=self.params['learning_rate'])
 
-    def save(self, is_best):
-        self.q.save('qnet', 'results/', is_best)
+    def save(self, is_best, seed):
+        self.q.save('qnet' + f'_seed{seed}', 'results/', is_best)
 
     def act(self, x, testing=False):
         if ((len(self.replay) < self.params['replay_warmup_steps']

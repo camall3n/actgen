@@ -39,7 +39,7 @@ class Trial:
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
-        parser.add_argument('--saved_model', type=str, default='results/qnet_best.pytorch',
+        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
                             help='Path to a saved model that"s fully trained')
         parser.add_argument('--out_file', type=str, default='results/change_q_metric.csv',
                             help='Path to a output file to write to that will contain the computed metrics')
@@ -85,7 +85,7 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
-            self.agent.q.load(self.params['saved_model'])
+            self.agent.q.load(self.params['load'])
 
     def teardown(self):
         pass

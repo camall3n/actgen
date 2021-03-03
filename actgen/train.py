@@ -113,7 +113,7 @@ class Trial:
             is_best = True
         else:
             is_best = False
-        self.agent.save(is_best)
+        self.agent.save(is_best, self.params['seed'])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0

@@ -44,6 +44,8 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
+        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.csv',
+                            help='Path to the saved model file')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -78,7 +80,7 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
-            self.agent.q.load("results/qnet_best.pytorch")
+            self.agent.q.load(self.params['load'])
 
 
     def teardown(self):
