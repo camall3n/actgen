@@ -178,9 +178,8 @@ def plot(old_values, new_values, action_idx):
     # plot reference line at 0
     plt.plot(possible_actions, np.zeros_like(possible_actions), '--k')
 
-    # plot all new values
-    for i, new_val in enumerate(new_values):
-        plt.plot(possible_actions, new_val - old_values, label='iter {}'.format(i))
+    # plot only the latest new value
+    plt.plot(possible_actions, new_values[-1] - old_values)
 
     plt.title('action {}'.format(action_idx))
     plt.xlabel('{} different actions'.format(n))
@@ -230,7 +229,6 @@ def main(test=False):
         # plot for current action
         max_change = np.max(new_values) - original_q_values[a]
         plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
-        plt.ylim(-1.2 * max_change, 1.2 * max_change)
         plot(original_q_values, new_values, a)
 
         # get metric for current action (precision recall)
