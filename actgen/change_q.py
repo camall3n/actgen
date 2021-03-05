@@ -283,7 +283,7 @@ def main(test=False):
     if not test:
         plt.figure()
         plt.title(f"confusion matrix: {bogy_trial.params['duplicate']} sets of duplicate action")
-        plt.xlabel(r'$\Delta$q(s,a)')
+        plt.xlabel(r'normalized $\Delta$q(s,a)')
         plt.ylabel("action being updated")
         plt.imshow(cm)
         plt.colorbar()
