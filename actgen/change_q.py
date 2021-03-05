@@ -186,6 +186,38 @@ def plot(old_values, new_values, action_idx):
     plt.ylabel(r'$\Delta$q(s,a)')
 
 
+def build_confusion_matrix(q_deltas, num_duplicate):
+    """
+    builds a confusion matrix for the direction of the bumps in q_delta
+
+    :param
+        q_deltas (np.array): each row corresponds to the latest q_delta from one action
+                            shape = (num_actions, len(q_delta_for_one_action)) = (num_actions, num_actions)
+        num_duplicate: number of set of duplicate actions
+    :return
+           a confusion matrix, where row corresponds to the action being updated, and col in that row correspond to
+           the delta for that intervention.
+           The index is arranged so that similar actions are adjacent: (a1, a2, .., an, b1, b2, .., bn, ..)
+    """
+    # arrange index so similar actions are adjacent
+    num_actions = len(q_deltas)
+    num_original_actions = int(num_actions / num_duplicate)
+    new_idx = []
+    for i in range(num_original_actions):
+        new_idx += list(range(i, num_actions, num_original_actions))
+    assert len(new_idx) == num_actions
+    q_deltas = q_deltas[new_idx]
+
+    mat = np.zeros((num_actions, num_actions))
+    for action, q_delta in enumerate(q_deltas):
+        # normalize q_delta by the mean
+        # q_delta -= np.mean(q_delta)
+        # put row in matrix
+        q_delta = q_delta[new_idx]
+        mat[action] = q_delta
+    return mat
+
+
 def main(test=False):
     # hyper parameters for plotting
     bogy_trial = Trial()
@@ -211,6 +243,9 @@ def main(test=False):
     # figure out what are the possible actions
     actions = range(num_total_actions)
 
+    # accumulate q_delta for each action
+    q_deltas = []
+
     # updates for each action
     for a in actions:
         # set up
@@ -225,6 +260,7 @@ def main(test=False):
             old_val, new_val = trial.dqn_directed_update(s, a, update_value)
             new_values.append(new_val)
             assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
+        q_deltas.append(new_values[-1] - original_q_values)
 
         # plot for current action
         max_change = np.max(new_values) - original_q_values[a]
@@ -240,6 +276,17 @@ def main(test=False):
     # show plot, close csv
     metrics_out_file.close()
     if not test:
+        plt.show()
+
+    # construct and plot the confusion matrix
+    cm = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
+    if not test:
+        plt.figure()
+        plt.title(f"confusion matrix: {bogy_trial.params['duplicate']} sets of duplicate action")
+        plt.xlabel(r'$\Delta$q(s,a)')
+        plt.ylabel("action being updated")
+        plt.imshow(cm)
+        plt.colorbar()
         plt.show()
 
 
