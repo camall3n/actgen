@@ -210,15 +210,8 @@ def build_confusion_matrix(q_deltas, num_duplicate):
 
     mat = np.zeros((num_actions, num_actions))
     for action, q_delta in enumerate(q_deltas):
-        # normalize q_delta by the mean of different actions
-        similar_actions = range(int(action % num_original_actions), num_actions, num_original_actions)
-        diff_actions = np.delete(range(num_actions), similar_actions)
-        print(q_delta[diff_actions])
-        mean = np.mean(q_delta[diff_actions])
-        assert mean.shape == ()
-        q_delta -= mean
-        # rescale to [0, 1]
-        q_delta = q_delta / np.max(q_delta)
+        # normalize q_delta by min-max scaling to [0, 1]
+        q_delta = (q_delta - np.min(q_delta)) / (np.max(q_delta) - np.min(q_delta))
         # put row in matrix
         q_delta = q_delta[new_idx]
         mat[action] = q_delta
