@@ -218,6 +218,39 @@ def build_confusion_matrix(q_deltas, num_duplicate):
     return mat
 
 
+def calc_g_score(avg_confusion_mat, num_duplicate):
+    """
+    calculate the two g scores based on an average confusion matrix
+
+    :param
+        avg_confusion_mat: a confusion matrix that's the average of multiple matrix over different states
+        num_duplicate: number of set of duplicate actions
+    :return: +g, -g
+    """
+    num_actions = len(avg_confusion_mat)
+    num_original_actions = int(num_actions / num_duplicate)
+    # matrix diagonal should be all 1's
+    for i in range(num_actions):
+        assert avg_confusion_mat[i, i] == 1
+
+    # get plus_g score
+    plus_g_sum = 0
+    for i in range(num_original_actions):
+        similar_square_block = avg_confusion_mat[i*num_duplicate: (i+1)*num_duplicate,
+                                                 i*num_duplicate: (i+1)*num_duplicate]
+        plus_g_sum += np.sum(similar_square_block)
+    plus_g = plus_g_sum - 1 * len(avg_confusion_mat)  # subtract 1's from diagonal
+    num_plus = len(avg_confusion_mat)*num_duplicate - len(avg_confusion_mat)  # number of entries used for the +g score
+    plus_g = plus_g / num_plus  # average the sum
+
+    # get minus_g score
+    minus_g_sum = np.sum(avg_confusion_mat) - plus_g_sum
+    num_minus = len(avg_confusion_mat)**2 - num_plus - len(avg_confusion_mat)  # number of entries used for the -g score
+    minus_g = minus_g_sum / num_minus  # average the sum
+
+    return plus_g, minus_g
+
+
 def main(test=False):
     # hyper parameters for plotting
     bogy_trial = Trial()
