@@ -31,7 +31,7 @@ class Trial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='CartPole-v0',
+        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random'],
@@ -40,10 +40,12 @@ class Trial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
+        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.csv',
+                            help='Path to the saved model file')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -67,6 +69,8 @@ class Trial:
         seeding.seed(0, random, torch, np)
         test_env = gym.make(self.params['env_name'])
         test_env = wrap.FixedDurationHack(test_env)
+        if isinstance(test_env.action_space, gym.spaces.Box):
+            test_env = wrap.DiscreteBox(test_env)
         test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
         test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000+self.params['seed'], gym, test_env)
@@ -76,7 +80,7 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
-            self.agent.q.load("results/qnet_best.pytorch")
+            self.agent.q.load(self.params['load'])
 
 
     def teardown(self):

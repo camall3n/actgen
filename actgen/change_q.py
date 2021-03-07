@@ -28,7 +28,7 @@ class Trial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='CartPole-v0',
+        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random'],
@@ -37,9 +37,9 @@ class Trial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
                             help='Path to hyperparameters csv file')
-        parser.add_argument('--saved_model', type=str, default='results/qnet_best.pytorch',
+        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
                             help='Path to a saved model that"s fully trained')
         parser.add_argument('--out_file', type=str, default='results/change_q_metric.csv',
                             help='Path to a output file to write to that will contain the computed metrics')
@@ -74,6 +74,8 @@ class Trial:
         seeding.seed(0, random, torch, np)
         test_env = gym.make(self.params['env_name'])
         test_env = wrap.FixedDurationHack(test_env)
+        if isinstance(test_env.action_space, gym.spaces.Box):
+            test_env = wrap.DiscreteBox(test_env)
         test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
         test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
@@ -83,7 +85,7 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
-            self.agent.q.load(self.params['saved_model'])
+            self.agent.q.load(self.params['load'])
 
     def teardown(self):
         pass
@@ -147,7 +149,8 @@ class Trial:
         similar_actions_values = np.take(difference, similar_actions, axis=-1)
         diff_actions_values = np.take(difference, diff_actions, axis=-1)
         assert similar_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
-        assert diff_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
+        assert (diff_actions_values.shape ==
+               (len(difference), num_total_actions - int(num_total_actions / num_different_actions)))
 
         # apply the thresh hold, ignore small changes
         similar_actions_values = np.where(abs(similar_actions_values) > thresh, similar_actions_values, 0)
@@ -175,13 +178,44 @@ def plot(old_values, new_values, action_idx):
     # plot reference line at 0
     plt.plot(possible_actions, np.zeros_like(possible_actions), '--k')
 
-    # plot all new values
-    for i, new_val in enumerate(new_values):
-        plt.plot(possible_actions, new_val - old_values, label='iter {}'.format(i))
+    # plot only the latest new value
+    plt.plot(possible_actions, new_values[-1] - old_values)
 
     plt.title('action {}'.format(action_idx))
     plt.xlabel('{} different actions'.format(n))
     plt.ylabel(r'$\Delta$q(s,a)')
+
+
+def build_confusion_matrix(q_deltas, num_duplicate):
+    """
+    builds a confusion matrix for the direction of the bumps in q_delta
+
+    :param
+        q_deltas (np.array): each row corresponds to the latest q_delta from one action
+                            shape = (num_actions, len(q_delta_for_one_action)) = (num_actions, num_actions)
+        num_duplicate: number of set of duplicate actions
+    :return
+           a confusion matrix, where row corresponds to the action being updated, and col in that row correspond to
+           the delta for that intervention.
+           The index is arranged so that similar actions are adjacent: (a1, a2, .., an, b1, b2, .., bn, ..)
+    """
+    # arrange index so similar actions are adjacent
+    num_actions = len(q_deltas)
+    num_original_actions = int(num_actions / num_duplicate)
+    new_idx = []
+    for i in range(num_original_actions):
+        new_idx += list(range(i, num_actions, num_original_actions))
+    assert len(new_idx) == num_actions
+    q_deltas = q_deltas[new_idx]
+
+    mat = np.zeros((num_actions, num_actions))
+    for action, q_delta in enumerate(q_deltas):
+        # normalize q_delta by min-max scaling to [0, 1]
+        q_delta = (q_delta - np.min(q_delta)) / (np.max(q_delta) - np.min(q_delta))
+        # put row in matrix
+        q_delta = q_delta[new_idx]
+        mat[action] = q_delta
+    return mat
 
 
 def main(test=False):
@@ -209,6 +243,9 @@ def main(test=False):
     # figure out what are the possible actions
     actions = range(num_total_actions)
 
+    # accumulate q_delta for each action
+    q_deltas = []
+
     # updates for each action
     for a in actions:
         # set up
@@ -223,11 +260,11 @@ def main(test=False):
             old_val, new_val = trial.dqn_directed_update(s, a, update_value)
             new_values.append(new_val)
             assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
+        q_deltas.append(new_values[-1] - original_q_values)
 
         # plot for current action
         max_change = np.max(new_values) - original_q_values[a]
         plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
-        plt.ylim(-1.2 * max_change, 1.2 * max_change)
         plot(original_q_values, new_values, a)
 
         # get metric for current action (precision recall)
@@ -237,9 +274,20 @@ def main(test=False):
         csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
 
     # show plot, close csv
+    metrics_out_file.close()
     if not test:
         plt.show()
-    metrics_out_file.close()
+
+    # construct and plot the confusion matrix
+    cm = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
+    if not test:
+        plt.figure()
+        plt.title(f"confusion matrix: {bogy_trial.params['duplicate']} sets of duplicate action")
+        plt.xlabel(r'normalized $\Delta$q(s,a)')
+        plt.ylabel("action being updated")
+        plt.imshow(cm)
+        plt.colorbar()
+        plt.show()
 
 
 if __name__ == "__main__":
