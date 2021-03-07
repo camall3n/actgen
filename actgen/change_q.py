@@ -47,8 +47,6 @@ class Trial:
                             help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--gscore', default=True, action='store_true',
-                            help='Calculate the g score, but not plot everything else')
         parser.add_argument('--num_update', '-n', type=int, default=5,
                             help='Number of times to update a particular action q value')
         parser.add_argument('--delta_update', '-u', type=float, default=10.0,
@@ -325,8 +323,6 @@ def main(test=False):
 
         # for each state
         cfn_mat_all_states[step, :, :] = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
-        if not bogy_trial.params['gscore']:
-            break
 
     # show plot, close csv
     metrics_out_file.close()
