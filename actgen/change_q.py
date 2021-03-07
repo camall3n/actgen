@@ -4,6 +4,7 @@ import random
 import csv
 
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 import numpy as np
 import gym
 import seeding
@@ -20,6 +21,7 @@ class Trial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
+        self.params['max_env_steps'] = 100
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
@@ -45,6 +47,8 @@ class Trial:
                             help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
+        parser.add_argument('--gscore', default=True, action='store_true',
+                            help='Calculate the g score, but not plot everything else')
         parser.add_argument('--num_update', '-n', type=int, default=5,
                             help='Number of times to update a particular action q value')
         parser.add_argument('--delta_update', '-u', type=float, default=10.0,
@@ -276,35 +280,53 @@ def main(test=False):
     # figure out what are the possible actions
     actions = range(num_total_actions)
 
-    # accumulate q_delta for each action
-    q_deltas = []
+    # confusion matrix for each state
+    cfn_mat_all_states = np.zeros((bogy_trial.params['max_env_steps'],
+                                   bogy_trial.test_env.action_space.n,
+                                   bogy_trial.test_env.action_space.n))
 
-    # updates for each action
-    for a in actions:
-        # set up
-        trial = Trial(test=test)
-        s = trial.test_env.reset()  # one starting state
-        original_q_values = trial.original_q_values(s)  # q(s,a) for all a in actions
+    # loop through a number of states
+    s, done = bogy_trial.test_env.reset(), False
+    for step in tqdm(range(bogy_trial.params['max_env_steps'])):
+        # figure out what the nest state is
+        action_taken = bogy_trial.agent.act(s)
+        sp, r, done, _ = bogy_trial.test_env.step(action_taken)
+        s = sp if not done else bogy_trial.test_env.reset()
 
-        update_value = original_q_values[a] + delta_update
-        new_values = []
-        # update for a few consecutive times
-        for i in range(num_updates):
-            old_val, new_val = trial.dqn_directed_update(s, a, update_value)
-            new_values.append(new_val)
-            assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
-        q_deltas.append(new_values[-1] - original_q_values)
+        # accumulate q_delta for each action
+        q_deltas = []
 
-        # plot for current action
-        max_change = np.max(new_values) - original_q_values[a]
-        plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
-        plot(original_q_values, new_values, a)
+        # updates for each action
+        for a in actions:
+            # set up
+            trial = Trial(test=test)
+            original_q_values = trial.original_q_values(s)  # q(s,a) for all a in actions
 
-        # get metric for current action (precision recall)
-        similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
-            trial.direction_of_change(original_q_values, new_values, a,
-                                      thresh=change_percentage_thresh * max_change)
-        csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
+            update_value = original_q_values[a] + delta_update
+            new_values = []
+            # update for a few consecutive times
+            for i in range(num_updates):
+                old_val, new_val = trial.dqn_directed_update(s, a, update_value)
+                new_values.append(new_val)
+                assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
+            q_deltas.append(new_values[-1] - original_q_values)
+
+            if step == 0:  # only plot for the 1st state
+                # plot for current action
+                max_change = np.max(new_values) - original_q_values[a]
+                plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
+                plot(original_q_values, new_values, a)
+
+                # get metric for current action (precision recall)
+                similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
+                    trial.direction_of_change(original_q_values, new_values, a,
+                                              thresh=change_percentage_thresh * max_change)
+                csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
+
+        # for each state
+        cfn_mat_all_states[step, :, :] = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
+        if not bogy_trial.params['gscore']:
+            break
 
     # show plot, close csv
     metrics_out_file.close()
@@ -312,13 +334,15 @@ def main(test=False):
         plt.show()
 
     # construct and plot the confusion matrix
-    cm = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
+    avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
+    plus_g, minus_g = calc_g_score(avg_cfn_mat, bogy_trial.params['duplicate'])
+    print(f"+g score: {plus_g} \n -g score: {minus_g}")
     if not test:
         plt.figure()
         plt.title(f"confusion matrix: {bogy_trial.params['duplicate']} sets of duplicate action")
         plt.xlabel(r'normalized $\Delta$q(s,a)')
         plt.ylabel("action being updated")
-        plt.imshow(cm)
+        plt.imshow(avg_cfn_mat)
         plt.colorbar()
         plt.show()
 
