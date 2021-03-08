@@ -5,11 +5,14 @@ from .dqn import QNet
 
 
 class DirectedQNet(QNet):
+    """
+    this represents a Q network that we can manipulate directed update on certain q(s, a)
+    """
     def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer, lr):
         super().__init__(n_features, n_actions, n_hidden_layers, n_units_per_layer)
         self.optimizer = torch.optim.Adam(list(self.parameters()), lr=lr)
 
-    def directed_update(self, states, actions, target, n_updates):
+    def directed_update(self, states, actions, delta_update, n_updates):
         """
         update the q network towards the specified target for the states and actions
         update q(s, a) towards target for all s in states, a in actions
@@ -17,7 +20,7 @@ class DirectedQNet(QNet):
         :param
             states: a list of states (s1, s2, ..., sn)
             actions: a list of actions (a1, a2, ..., am)
-            target: the target towards which to update the q(s,a) to
+            delta_update: update q(s,a) towards q(s,a) + delta_update
             n_updates: number of times to update each q(s, a)
         :return:
             q_delta for each state-action-updated pair,
@@ -29,19 +32,23 @@ class DirectedQNet(QNet):
             for a_idx, a in enumerate(actions):
 
                 # get original q-values & update target
+                self.eval()
                 original_q_values = self.forward(s.float())  # q(s, a') for all a'
                 q_target = original_q_values.clone()
-                q_target[0][a] = target
+                q_target[0][a] = original_q_values[0][a] + delta_update
 
                 # perform n updates for q(s, a)
                 self.train()
+                self.optimizer.zero_grad()
+                loss = torch.nn.functional.smooth_l1_loss(input=original_q_values, target=q_target)
+                loss.backward()
                 for _ in range(n_updates):
-                    self.optimizer.zero_grad()
-                    loss = torch.nn.functional.smooth_l1_loss(input=original_q_values, target=q_target)
-                    loss.backward()
                     self.optimizer.step()
 
                 self.eval()
                 new_q_values = self.forward(s.float())
-                q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy()[0]
+                q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy()[0] - original_q_values.detach().numpy()[0]
         return q_delta
+
+    def forward(self, *args, **kwargs):
+        return super().forward(*args, **kwargs)

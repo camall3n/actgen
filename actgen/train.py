@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import RandomAgent, DQNAgent, QNet
+from .agents import RandomAgent, DQNAgent, DirectedQNet
 from .utils import Experience
 
 logging.basicConfig(level=logging.INFO)
@@ -77,7 +77,7 @@ class Trial:
         env = wrap.TorchInterface(env)
         test_env = copy.deepcopy(env)
         seeding.seed(self.params['seed'], gym, env)
-        seeding.seed(1000+self.params['seed'], gym, test_env)
+        seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
         self.test_env = test_env
 
@@ -95,7 +95,7 @@ class Trial:
         for count in range(self.params['updates_per_env_step']):
             temp = self.agent.update()
             loss.append(temp)
-        loss = sum(loss)/len(loss)
+        loss = sum(loss) / len(loss)
         return loss
 
     def evaluate(self, step):
@@ -107,7 +107,7 @@ class Trial:
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
-        avg_episode_score = (sum(ep_scores)/len(ep_scores)).item()
+        avg_episode_score = (sum(ep_scores) / len(ep_scores)).item()
         logging.info("Evaluation: step {}, average score {}".format(
             step, avg_episode_score))
         if avg_episode_score > self.best_score:
@@ -119,10 +119,11 @@ class Trial:
 
     def gscore_callback(self, step):
         # copy the current q network
-        q_net = QNet(n_features=self.env.observation_space.shape[0],
-                     n_actions=self.env.action_space.n,
-                     n_hidden_layers=self.params['n_hidden_layers'],
-                     n_units_per_layer=self.params['n_units_per_layer'])
+        q_net = DirectedQNet(n_features=self.env.observation_space.shape[0],
+                             n_actions=self.env.action_space.n,
+                             n_hidden_layers=self.params['n_hidden_layers'],
+                             n_units_per_layer=self.params['n_units_per_layer'],
+                             lr=self.params['learning_rate'])
         q_net.hard_copy_from(self.agent.q)
         # perform directed q-update for each action, across multiple states
         # TODO:
@@ -147,6 +148,7 @@ class Trial:
 def main(test=False):
     trial = Trial(test=test)
     trial.run()
+
 
 if __name__ == "__main__":
     main()
