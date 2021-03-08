@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import RandomAgent, DQNAgent
+from .agents import RandomAgent, DQNAgent, QNet
 from .utils import Experience
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +46,8 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
+        parser.add_argument('--gscore', default=False, action='store_true',
+                            help='Calculate the g-score vs time as training proceeds')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -114,6 +116,16 @@ class Trial:
         else:
             is_best = False
         self.agent.save(is_best, self.params['seed'])
+
+    def gscore_callback(self, step):
+        # copy the current q network
+        q_net = QNet(n_features=self.env.observation_space.shape[0],
+                     n_actions=self.env.action_space.n,
+                     n_hidden_layers=self.params['n_hidden_layers'],
+                     n_units_per_layer=self.params['n_units_per_layer'])
+        q_net.hard_copy_from(self.agent.q)
+        # perform directed q-update for each action, across multiple states
+        # TODO:
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
