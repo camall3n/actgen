@@ -166,7 +166,7 @@ class Trial:
         return num_same_dir_similar, num_diff_dir_similar, num_same_dir_diff, num_diff_dir_diff
 
 
-def plot(old_values, new_values, action_idx):
+def plot_q_delta(old_values, new_values, action_idx):
     """
     given a set of old and new q values, plot them in a graph to compare
     this function plots the change in q_values in one plot for one action
@@ -253,6 +253,16 @@ def calc_g_score(avg_confusion_mat, num_duplicate):
     return plus_g, minus_g
 
 
+def plot_confusion_matrix(mat, num_duplicate, num_states):
+    plt.figure()
+    plt.title(f"average confusion matrix: {num_duplicate} sets of duplicate action, {num_states} states")
+    plt.xlabel(r'normalized $\Delta$q(s,a)')
+    plt.ylabel("action being updated")
+    plt.imshow(mat)
+    plt.colorbar()
+    plt.show()
+
+
 def main(test=False):
     # hyper parameters for plotting
     bogy_trial = Trial()
@@ -310,10 +320,10 @@ def main(test=False):
             q_deltas.append(new_values[-1] - original_q_values)
 
             if step == 0:  # only plot for the 1st state
-                # plot for current action
+                # plot q_delta for current action
                 max_change = np.max(new_values) - original_q_values[a]
                 plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
-                plot(original_q_values, new_values, a)
+                plot_q_delta(original_q_values, new_values, a)
 
                 # get metric for current action (precision recall)
                 similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
@@ -324,7 +334,7 @@ def main(test=False):
         # for each state
         cfn_mat_all_states[step, :, :] = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
 
-    # show plot, close csv
+    # show q_delta plot, close csv
     metrics_out_file.close()
     if not test:
         plt.show()
@@ -332,15 +342,9 @@ def main(test=False):
     # construct and plot the confusion matrix
     avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
     plus_g, minus_g = calc_g_score(avg_cfn_mat, bogy_trial.params['duplicate'])
-    print(f"+g score: {plus_g} \n -g score: {minus_g}")
     if not test:
-        plt.figure()
-        plt.title(f"confusion matrix: {bogy_trial.params['duplicate']} sets of duplicate action")
-        plt.xlabel(r'normalized $\Delta$q(s,a)')
-        plt.ylabel("action being updated")
-        plt.imshow(avg_cfn_mat)
-        plt.colorbar()
-        plt.show()
+        print(f"+g score: {plus_g} \n -g score: {minus_g}")
+        plot_confusion_matrix(avg_cfn_mat, bogy_trial.params['duplicate'], bogy_trial.params['max_env_steps'])
 
 
 if __name__ == "__main__":
