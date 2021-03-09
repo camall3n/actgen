@@ -13,6 +13,7 @@ from . import utils
 from . import wrappers as wrap
 from .agents import RandomAgent, DQNAgent, DirectedQNet
 from .utils import Experience
+from .gscore import plot_confusion_matrix, calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
 
