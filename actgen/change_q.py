@@ -25,7 +25,6 @@ class Trial:
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
-        self.optimizer = torch.optim.Adam(list(self.agent.q.parameters()), lr=self.params['learning_rate'])
 
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -117,9 +116,9 @@ def direction_of_change(q_deltas, a, thresh, num_total_actions, num_dup_actions)
     # get q values for similar & different actions
     similar_actions_values = q_deltas[similar_actions]
     diff_actions_values = q_deltas[diff_actions]
-    assert similar_actions_values.shape == (int(num_total_actions / num_different_actions), )
+    assert similar_actions_values.shape == (int(num_total_actions / num_different_actions),)
     assert (diff_actions_values.shape ==
-           (num_total_actions - int(num_total_actions / num_different_actions), ))
+            (num_total_actions - int(num_total_actions / num_different_actions),))
 
     # apply the thresh hold, ignore small changes
     similar_actions_values = np.where(abs(similar_actions_values) > thresh, similar_actions_values, 0)
@@ -204,16 +203,18 @@ def calc_g_score(avg_confusion_mat, num_duplicate):
     # get plus_g score
     plus_g_sum = 0
     for i in range(num_original_actions):
-        similar_square_block = avg_confusion_mat[i*num_duplicate: (i+1)*num_duplicate,
-                                                 i*num_duplicate: (i+1)*num_duplicate]
+        similar_square_block = avg_confusion_mat[i * num_duplicate: (i + 1) * num_duplicate,
+                               i * num_duplicate: (i + 1) * num_duplicate]
         plus_g_sum += np.sum(similar_square_block)
     plus_g = plus_g_sum - 1 * len(avg_confusion_mat)  # subtract 1's from diagonal
-    num_plus = len(avg_confusion_mat)*num_duplicate - len(avg_confusion_mat)  # number of entries used for the +g score
+    num_plus = len(avg_confusion_mat) * num_duplicate - len(
+        avg_confusion_mat)  # number of entries used for the +g score
     plus_g = plus_g / num_plus  # average the sum
 
     # get minus_g score
     minus_g_sum = np.sum(avg_confusion_mat) - plus_g_sum
-    num_minus = len(avg_confusion_mat)**2 - num_plus - len(avg_confusion_mat)  # number of entries used for the -g score
+    num_minus = len(avg_confusion_mat) ** 2 - num_plus - len(
+        avg_confusion_mat)  # number of entries used for the -g score
     minus_g = minus_g_sum / num_minus  # average the sum
 
     return plus_g, minus_g
@@ -242,7 +243,7 @@ def main(test=False):
     out_file_path = bogy_trial.params['out_file']
 
     # figure out what are the possible actions
-    actions = range(num_total_actions)
+    actions = list(range(num_total_actions))
 
     # get all states we care about
     states = []
@@ -256,12 +257,11 @@ def main(test=False):
 
     # perform directed update for all states and actions
     q_net = DirectedQNet(n_features=bogy_trial.test_env.observation_space.shape[0],
-                        n_actions=bogy_trial.test_env.action_space.n,
-                        n_hidden_layers=bogy_trial.params['n_hidden_layers'],
-                        n_units_per_layer=bogy_trial.params['n_units_per_layer'],
-                        lr=bogy_trial.params['learning_rate'])
-    q_net.hard_copy_from(bogy_trial.agent.q)
-    q_deltas = q_net.directed_update(states, actions, delta_update, num_updates)
+                         n_actions=bogy_trial.test_env.action_space.n,
+                         n_hidden_layers=bogy_trial.params['n_hidden_layers'],
+                         n_units_per_layer=bogy_trial.params['n_units_per_layer'],
+                         lr=bogy_trial.params['learning_rate'])
+    q_deltas = q_net.directed_update(states, actions, delta_update, num_updates, bogy_trial.agent.q)
 
     # write to csv of direction of change (both for an average state)
     q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
@@ -285,16 +285,16 @@ def main(test=False):
         q_deltas_first = q_deltas[0]
         plt.figure()
         for a in actions:  # for each action updated
-            plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a+1)
+            plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
             plot_q_delta(q_deltas_first[a], a)
         plt.show()
 
     # construct and plot the confusion matrix
-    cfn_mat_all_states = np.zeros((bogy_trial.params['max_env_steps'],
+    cfn_mat_all_states = np.zeros((len(states),
                                    bogy_trial.test_env.action_space.n,
                                    bogy_trial.test_env.action_space.n))
     for i, _ in enumerate(states):
-        cfn_mat_all_states[i, :, :] = build_confusion_matrix(q_deltas[i], bogy_trial.params['duplicate'])
+        cfn_mat_all_states[i, :, :] = build_confusion_matrix(q_deltas[i, :, :], bogy_trial.params['duplicate'])
     avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
     plus_g, minus_g = calc_g_score(avg_cfn_mat, bogy_trial.params['duplicate'])
     if not test:

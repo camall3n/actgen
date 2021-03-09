@@ -10,9 +10,9 @@ class DirectedQNet(QNet):
     """
     def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer, lr):
         super().__init__(n_features, n_actions, n_hidden_layers, n_units_per_layer)
-        self.optimizer = torch.optim.Adam(list(self.parameters()), lr=lr)
+        self.optimizer = torch.optim.SGD(list(self.parameters()), lr=lr)
 
-    def directed_update(self, states, actions, delta_update, n_updates):
+    def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
         update the q network towards the specified target for the states and actions
         update q(s, a) towards target for all s in states, a in actions
@@ -30,12 +30,14 @@ class DirectedQNet(QNet):
         q_delta = np.zeros((len(states), len(actions), self.n_actions))
         for s_idx, s in enumerate(states):
             for a_idx, a in enumerate(actions):
+                # reset the q_net for each state
+                self.hard_copy_from(baseline_qnet)
 
                 # get original q-values & update target
                 self.eval()
                 original_q_values = self.forward(s.float())  # q(s, a') for all a'
                 q_target = original_q_values.clone()
-                q_target[0][a] = original_q_values[0][a] + delta_update
+                q_target[0][a] = float(original_q_values[0][a]) + delta_update
 
                 # perform n updates for q(s, a)
                 self.train()
