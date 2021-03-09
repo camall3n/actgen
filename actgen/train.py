@@ -178,7 +178,8 @@ class Trial:
             else:
                 s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
-            utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
+            if self.params['gscore']:
+                utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
         self.save_gscores()
         self.teardown()
 
