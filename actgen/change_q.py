@@ -223,7 +223,7 @@ def main(test=False):
     plus_g, minus_g = calc_g_score(avg_cfn_mat, bogy_trial.params['duplicate'])
     if not test:
         print(f"+g score: {plus_g} \n -g score: {minus_g}")
-        plot_confusion_matrix(avg_cfn_mat, bogy_trial.params['duplicate'], bogy_trial.params['max_env_steps'])
+        plot_confusion_matrix(avg_cfn_mat, bogy_trial.params['duplicate'], len(states))
 
 
 if __name__ == "__main__":
