@@ -54,6 +54,8 @@ class Trial:
                             help='when calculating gscore: increase the q value by this much for every update applied')
         parser.add_argument('--gscore', default=False, action='store_true',
                             help='Calculate the g-score vs time as training proceeds')
+        parser.add_argument('--optimizer', type=str, default='sgd',
+                            help='Which optimizer to use when manipulating q values')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -131,7 +133,8 @@ class Trial:
                              n_actions=self.env.action_space.n,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
-                             lr=self.params['learning_rate'])
+                             lr=self.params['learning_rate'],
+                             optim=self.params['optimizer'])
 
         # perform directed q-update for each action, across multiple states
         actions = list(range(self.test_env.action_space.n))

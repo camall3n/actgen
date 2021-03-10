@@ -8,9 +8,13 @@ class DirectedQNet(QNet):
     """
     this represents a Q network that we can manipulate directed update on certain q(s, a)
     """
-    def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer, lr):
+    def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer, lr, optim='sgd'):
         super().__init__(n_features, n_actions, n_hidden_layers, n_units_per_layer)
-        self.optimizer = torch.optim.SGD(list(self.parameters()), lr=lr)
+        assert optim in ['sgd', 'adam']
+        if optim == 'sgd':
+            self.optimizer = torch.optim.SGD(list(self.parameters()), lr=lr)
+        if optim == 'adam':
+            self.optimizer = torch.optim.Adam(list(self.parameters()), lr=lr)
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """

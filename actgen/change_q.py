@@ -53,6 +53,8 @@ class Trial:
                             help='increase the q value by this much for every update applied')
         parser.add_argument('--change_percentage_thresh', '-p', type=float, default=0.10,
                             help='only changes past this percentage are considered when computing the metrics')
+        parser.add_argument('--optimizer', type=str, default='sgd',
+                            help='Which optimizer to use when manipulating q values')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -184,7 +186,8 @@ def main(test=False):
                          n_actions=bogy_trial.test_env.action_space.n,
                          n_hidden_layers=bogy_trial.params['n_hidden_layers'],
                          n_units_per_layer=bogy_trial.params['n_units_per_layer'],
-                         lr=bogy_trial.params['learning_rate'])
+                         lr=bogy_trial.params['learning_rate'],
+                         optim=bogy_trial.params['optimizer'])
     q_deltas = q_net.directed_update(states, actions, delta_update, num_updates, bogy_trial.agent.q)
 
     # write to csv of direction of change (both for an average state)
