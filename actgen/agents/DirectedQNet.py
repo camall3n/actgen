@@ -33,18 +33,19 @@ class DirectedQNet(QNet):
                 # reset the q_net for each state
                 self.hard_copy_from(baseline_qnet)
 
-                # get original q-values & update target
-                self.eval()
-                original_q_values = self.forward(s.float())  # q(s, a') for all a'
-                q_target = original_q_values.clone()
-                q_target[0][a] = float(original_q_values[0][a]) + delta_update
+                with torch.no_grad():
+                    original_q_values = self.forward(s.float())
+                    q_target = original_q_values.clone()
+                    q_target[0][a] = float(original_q_values[0][a]) + delta_update
 
-                # perform n updates for q(s, a)
+                # perform updates for q(s, a)
                 self.train()
-                self.optimizer.zero_grad()
-                loss = torch.nn.functional.smooth_l1_loss(input=original_q_values, target=q_target)
-                loss.backward()
-                for _ in range(n_updates):
+                for i in range(n_updates):
+                    current_q_vals = self.forward(s.float())  # q(s, a') for all a'
+
+                    self.optimizer.zero_grad()
+                    loss = torch.nn.functional.smooth_l1_loss(input=current_q_vals, target=q_target)
+                    loss.backward()
                     self.optimizer.step()
 
                 self.eval()
