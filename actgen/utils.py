@@ -50,7 +50,7 @@ def every_n_times(n, count, callback, *args, final_count=None):
         callback(*args)
 
 
-def plot_training_gscore(fname='results/training_gscore.csv'):
+def plot_training_gscore(fname='results/training_gscore_sgd.csv'):
     """
     plot the +/- g score over time as training proceeds
     """
@@ -64,7 +64,7 @@ def plot_training_gscore(fname='results/training_gscore.csv'):
         plt.figure()
         plt.plot(time, plus_g, label='+g')
         plt.plot(time, minus_g, label='-g')
-        plt.title('g score over time during training')
+        plt.title('g score over time during training with SGD')
         plt.xlabel('training step')
         plt.ylabel('g score')
         plt.legend()

@@ -11,10 +11,8 @@ class DirectedQNet(QNet):
     def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer, lr, optim='sgd'):
         super().__init__(n_features, n_actions, n_hidden_layers, n_units_per_layer)
         assert optim in ['sgd', 'adam']
-        if optim == 'sgd':
-            self.optimizer = torch.optim.SGD(list(self.parameters()), lr=lr)
-        if optim == 'adam':
-            self.optimizer = torch.optim.Adam(list(self.parameters()), lr=lr)
+        self.optim = optim
+        self.lr = lr
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
@@ -36,6 +34,10 @@ class DirectedQNet(QNet):
             for a_idx, a in enumerate(actions):
                 # reset the q_net for each state
                 self.hard_copy_from(baseline_qnet)
+                if self.optim == 'sgd':
+                    optimizer = torch.optim.SGD(list(self.parameters()), lr=self.lr)
+                if self.optim == 'adam':
+                    optimizer = torch.optim.Adam(list(self.parameters()), lr=self.lr)
 
                 with torch.no_grad():
                     original_q_values = self.forward(s.float())
@@ -47,10 +49,10 @@ class DirectedQNet(QNet):
                 for i in range(n_updates):
                     current_q_vals = self.forward(s.float())  # q(s, a') for all a'
 
-                    self.optimizer.zero_grad()
+                    optimizer.zero_grad()
                     loss = torch.nn.functional.smooth_l1_loss(input=current_q_vals, target=q_target)
                     loss.backward()
-                    self.optimizer.step()
+                    optimizer.step()
 
                 self.eval()
                 new_q_values = self.forward(s.float())
