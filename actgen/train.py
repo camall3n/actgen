@@ -48,7 +48,7 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=5,
+        parser.add_argument('--num_update', '-n', type=int, default=1,
                             help='when calculating gscore: Number of times to update a particular action q value')
         parser.add_argument('--delta_update', '-u', type=float, default=10.0,
                             help='when calculating gscore: increase the q value by this much for every update applied')

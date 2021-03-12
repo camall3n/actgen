@@ -22,7 +22,6 @@ class Trial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
-        self.params['max_env_steps'] = 100
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
@@ -47,7 +46,7 @@ class Trial:
                             help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=5,
+        parser.add_argument('--num_update', '-n', type=int, default=1,
                             help='Number of times to update a particular action q value')
         parser.add_argument('--delta_update', '-u', type=float, default=10.0,
                             help='increase the q value by this much for every update applied')
@@ -174,7 +173,7 @@ def main(test=False):
     # get all states we care about
     states = []
     s, done = bogy_trial.test_env.reset(), False
-    for _ in tqdm(range(bogy_trial.params['max_env_steps'])):
+    for _ in tqdm(range(bogy_trial.params['n_gscore_states'])):
         # figure out what the nest state is
         action_taken = bogy_trial.agent.act(s)
         sp, r, done, _ = bogy_trial.test_env.step(action_taken)
