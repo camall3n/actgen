@@ -30,6 +30,7 @@ class Trial:
             self.params['epsilon_decay_period'] = 250
             self.params['n_eval_episodes'] = 2
             self.params['replay_warmup_steps'] = 50
+            self.params['gscore'] = True
         self.setup()
 
     def parse_args(self):
