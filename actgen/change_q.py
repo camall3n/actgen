@@ -88,6 +88,7 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
+            print("loading model from ", self.params['load'])
             self.agent.q.load(self.params['load'])
 
     def teardown(self):
@@ -157,7 +158,7 @@ def plot_q_delta(q_deltas, action_idx):
 
 def main(test=False):
     # hyper parameters for plotting
-    bogy_trial = Trial()
+    bogy_trial = Trial(test=test)
     num_updates = bogy_trial.params['num_update']  # number of consecutive updates
     delta_update = bogy_trial.params['delta_update']  # add this to the original q value each iteration of the update
     # only changes past this percentage threshold are considered a change.
