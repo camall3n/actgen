@@ -18,7 +18,7 @@ from .gscore import plot_confusion_matrix, calc_g_score, build_confusion_matrix
 logging.basicConfig(level=logging.INFO)
 
 
-class Trial:
+class ManipulationTrial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
@@ -94,6 +94,71 @@ class Trial:
     def teardown(self):
         pass
 
+    def run(self):
+        # number of actions
+        num_total_actions = int(self.test_env.action_space.n)
+        num_different_actions = int(num_total_actions / self.params['duplicate'])
+
+        # figure out what are the possible actions
+        actions = list(range(num_total_actions))
+
+        # get all states we care about
+        states = []
+        s, done = self.test_env.reset(), False
+        for _ in tqdm(range(self.params['n_gscore_states'])):
+            # figure out what the nest state is
+            action_taken = self.agent.act(s)
+            sp, r, done, _ = self.test_env.step(action_taken)
+            s = sp if not done else self.test_env.reset()
+            states.append(s)
+
+        # perform directed update for all states and actions
+        q_net = DirectedQNet(n_features=self.test_env.observation_space.shape[0],
+                             n_actions=self.test_env.action_space.n,
+                             n_hidden_layers=self.params['n_hidden_layers'],
+                             n_units_per_layer=self.params['n_units_per_layer'],
+                             lr=self.params['learning_rate'],
+                             optim=self.params['optimizer'])
+        q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
+
+        # write to csv of direction of change (both for an average state)
+        q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
+        assert q_deltas_avg.shape == (len(actions), num_total_actions)
+
+        with open(self.params['out_file'], 'w') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['number of similar actions that are updated in the same direction',
+                                 'number of similar actions that are updated in the different direction',
+                                 'number of different actions that are updated in the same direction',
+                                 'number of different actions that are updated in the different direction'])
+            for a in actions:
+                max_change = np.max(q_deltas_avg[a])
+                similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
+                    direction_of_change(q_deltas_avg[a], a, self.params['change_percentage_thresh'] * max_change,
+                                        num_total_actions, self.params['duplicate'])
+                csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
+
+        # plot the q_delta (for an average state)
+        if not self.params['test']:
+            q_deltas_first = q_deltas[0]
+            plt.figure()
+            for a in actions:  # for each action updated
+                plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
+                plot_q_delta(q_deltas_first[a], a)
+            plt.show()
+
+        # construct and plot the confusion matrix
+        cfn_mat_all_states = np.zeros((len(states),
+                                       self.test_env.action_space.n,
+                                       self.test_env.action_space.n))
+        for i, _ in enumerate(states):
+            cfn_mat_all_states[i, :, :] = build_confusion_matrix(q_deltas[i, :, :], self.params['duplicate'])
+        avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
+        plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
+        if not self.params['test']:
+            print(f"+g score: {plus_g} \n -g score: {minus_g}")
+            plot_confusion_matrix(avg_cfn_mat, self.params['duplicate'], len(states))
+
 
 def direction_of_change(q_deltas, a, thresh, num_total_actions, num_dup_actions):
     """
@@ -157,76 +222,8 @@ def plot_q_delta(q_deltas, action_idx):
 
 
 def main(test=False):
-    # hyper parameters for plotting
-    bogy_trial = Trial(test=test)
-    num_updates = bogy_trial.params['num_update']  # number of consecutive updates
-    delta_update = bogy_trial.params['delta_update']  # add this to the original q value each iteration of the update
-    # only changes past this percentage threshold are considered a change.
-    # this percentage is the percentage of the maximum increase the q value experienced.
-    change_percentage_thresh = bogy_trial.params['change_percentage_thresh']
-    num_total_actions = int(bogy_trial.test_env.action_space.n)
-    num_different_actions = int(num_total_actions / bogy_trial.params['duplicate'])
-    out_file_path = bogy_trial.params['out_file']
-
-    # figure out what are the possible actions
-    actions = list(range(num_total_actions))
-
-    # get all states we care about
-    states = []
-    s, done = bogy_trial.test_env.reset(), False
-    for _ in tqdm(range(bogy_trial.params['n_gscore_states'])):
-        # figure out what the nest state is
-        action_taken = bogy_trial.agent.act(s)
-        sp, r, done, _ = bogy_trial.test_env.step(action_taken)
-        s = sp if not done else bogy_trial.test_env.reset()
-        states.append(s)
-
-    # perform directed update for all states and actions
-    q_net = DirectedQNet(n_features=bogy_trial.test_env.observation_space.shape[0],
-                         n_actions=bogy_trial.test_env.action_space.n,
-                         n_hidden_layers=bogy_trial.params['n_hidden_layers'],
-                         n_units_per_layer=bogy_trial.params['n_units_per_layer'],
-                         lr=bogy_trial.params['learning_rate'],
-                         optim=bogy_trial.params['optimizer'])
-    q_deltas = q_net.directed_update(states, actions, delta_update, num_updates, bogy_trial.agent.q)
-
-    # write to csv of direction of change (both for an average state)
-    q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
-    assert q_deltas_avg.shape == (len(actions), num_total_actions)
-
-    with open(out_file_path, 'w') as f:
-        csv_writer = csv.writer(f)
-        csv_writer.writerow(['number of similar actions that are updated in the same direction',
-                             'number of similar actions that are updated in the different direction',
-                             'number of different actions that are updated in the same direction',
-                             'number of different actions that are updated in the different direction'])
-        for a in actions:
-            max_change = np.max(q_deltas_avg[a])
-            similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
-                direction_of_change(q_deltas_avg[a], a, change_percentage_thresh * max_change,
-                                    num_total_actions, bogy_trial.params['duplicate'])
-            csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
-
-    # plot the q_delta (for an average state)
-    if not test:
-        q_deltas_first = q_deltas[0]
-        plt.figure()
-        for a in actions:  # for each action updated
-            plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
-            plot_q_delta(q_deltas_first[a], a)
-        plt.show()
-
-    # construct and plot the confusion matrix
-    cfn_mat_all_states = np.zeros((len(states),
-                                   bogy_trial.test_env.action_space.n,
-                                   bogy_trial.test_env.action_space.n))
-    for i, _ in enumerate(states):
-        cfn_mat_all_states[i, :, :] = build_confusion_matrix(q_deltas[i, :, :], bogy_trial.params['duplicate'])
-    avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
-    plus_g, minus_g = calc_g_score(avg_cfn_mat, bogy_trial.params['duplicate'])
-    if not test:
-        print(f"+g score: {plus_g} \n -g score: {minus_g}")
-        plot_confusion_matrix(avg_cfn_mat, bogy_trial.params['duplicate'], len(states))
+    trial = ManipulationTrial(test=test)
+    trial.run()
 
 
 if __name__ == "__main__":
