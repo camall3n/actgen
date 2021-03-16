@@ -2,6 +2,7 @@ import argparse
 import copy
 import logging
 import random
+import csv
 
 import numpy as np
 import gym
@@ -11,8 +12,9 @@ from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import RandomAgent, DQNAgent
+from .agents import RandomAgent, DQNAgent, DirectedQNet
 from .utils import Experience
+from .gscore import calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,6 +30,7 @@ class Trial:
             self.params['epsilon_decay_period'] = 250
             self.params['n_eval_episodes'] = 2
             self.params['replay_warmup_steps'] = 50
+            self.params['gscore'] = True
         self.setup()
 
     def parse_args(self):
@@ -46,6 +49,14 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
+        parser.add_argument('--num_update', '-n', type=int, default=1,
+                            help='when calculating gscore: Number of times to update a particular action q value')
+        parser.add_argument('--delta_update', '-u', type=float, default=10.0,
+                            help='when calculating gscore: increase the q value by this much for every update applied')
+        parser.add_argument('--gscore', default=False, action='store_true',
+                            help='Calculate the g-score vs time as training proceeds')
+        parser.add_argument('--optimizer', type=str, default='sgd',
+                            help='Which optimizer to use when manipulating q values')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -75,7 +86,7 @@ class Trial:
         env = wrap.TorchInterface(env)
         test_env = copy.deepcopy(env)
         seeding.seed(self.params['seed'], gym, env)
-        seeding.seed(1000+self.params['seed'], gym, test_env)
+        seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
         self.test_env = test_env
 
@@ -85,6 +96,8 @@ class Trial:
             self.agent = DQNAgent(env.observation_space, env.action_space, self.params)
         self.best_score = -np.inf
 
+        self.gscores = []
+
     def teardown(self):
         pass
 
@@ -93,7 +106,7 @@ class Trial:
         for count in range(self.params['updates_per_env_step']):
             temp = self.agent.update()
             loss.append(temp)
-        loss = sum(loss)/len(loss)
+        loss = sum(loss) / len(loss)
         return loss
 
     def evaluate(self, step):
@@ -105,7 +118,7 @@ class Trial:
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
-        avg_episode_score = (sum(ep_scores)/len(ep_scores)).item()
+        avg_episode_score = (sum(ep_scores) / len(ep_scores)).item()
         logging.info("Evaluation: step {}, average score {}".format(
             step, avg_episode_score))
         if avg_episode_score > self.best_score:
@@ -114,6 +127,46 @@ class Trial:
         else:
             is_best = False
         self.agent.save(is_best, self.params['seed'])
+
+    def gscore_callback(self, step):
+        # make a net qnet to test manipulated q updates on
+        q_net = DirectedQNet(n_features=self.env.observation_space.shape[0],
+                             n_actions=self.env.action_space.n,
+                             n_hidden_layers=self.params['n_hidden_layers'],
+                             n_units_per_layer=self.params['n_units_per_layer'],
+                             lr=self.params['learning_rate'],
+                             optim=self.params['optimizer'])
+
+        # perform directed q-update for each action, across multiple states
+        actions = list(range(self.test_env.action_space.n))
+        states = []
+        s, done = self.test_env.reset(), False
+        for _ in range(self.params['n_gscore_states']):
+            # figure out what the nest state is
+            action_taken = self.agent.act(s)
+            sp, r, done, _ = self.test_env.step(action_taken)
+            s = sp if not done else self.test_env.reset()
+            states.append(s)
+        q_deltas = q_net.directed_update(states, actions, self.params['delta_update'],
+                                         self.params['num_update'], self.agent.q)
+
+        # get g-score
+        cfn_mat_all_states = np.zeros((len(states),
+                                       self.test_env.action_space.n,
+                                       self.test_env.action_space.n))
+        for i, _ in enumerate(states):
+            cfn_mat_all_states[i, :, :] = build_confusion_matrix(q_deltas[i, :, :], self.params['duplicate'])
+        avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
+        plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
+
+        # store the g-score at this time step
+        self.gscores.append((step, plus_g, minus_g))
+
+    def save_gscores(self):
+        with open("results/training_gscore.csv", 'w') as f:
+            csv_writer = csv.writer(f)
+            for g in self.gscores:
+                csv_writer.writerow([g[0], g[1], g[2]])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
@@ -129,12 +182,16 @@ class Trial:
             else:
                 s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
+            if self.params['gscore']:
+                utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
+        self.save_gscores()
         self.teardown()
 
 
 def main(test=False):
     trial = Trial(test=test)
     trial.run()
+
 
 if __name__ == "__main__":
     main()

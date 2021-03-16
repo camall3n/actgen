@@ -4,6 +4,7 @@ import random
 import csv
 
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 import numpy as np
 import gym
 import seeding
@@ -11,19 +12,19 @@ import torch
 
 from . import utils
 from . import wrappers as wrap
-from .agents import DQNAgent
+from .agents import DQNAgent, DirectedQNet
+from .gscore import plot_confusion_matrix, calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
 
 
-class Trial:
+class ManipulationTrial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
-        self.optimizer = torch.optim.Adam(list(self.agent.q.parameters()), lr=self.params['learning_rate'])
 
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -45,12 +46,14 @@ class Trial:
                             help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=5,
+        parser.add_argument('--num_update', '-n', type=int, default=1,
                             help='Number of times to update a particular action q value')
         parser.add_argument('--delta_update', '-u', type=float, default=10.0,
                             help='increase the q value by this much for every update applied')
         parser.add_argument('--change_percentage_thresh', '-p', type=float, default=0.10,
                             help='only changes past this percentage are considered when computing the metrics')
+        parser.add_argument('--optimizer', type=str, default='sgd',
+                            help='Which optimizer to use when manipulating q values')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -85,209 +88,142 @@ class Trial:
         self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
+            print("loading model from ", self.params['load'])
             self.agent.q.load(self.params['load'])
 
     def teardown(self):
         pass
 
-    def original_q_values(self, state):
-        """
-        get the q values for all actions for a particular state
-        """
-        self.agent.q.eval()
-        q_values = self.agent.q(state.float())
-        return q_values.detach().numpy()[0]
-
-    def dqn_directed_update(self, state, action, toward_target):
-        """
-        update the dqn agent towards a target for one state.
-        specifically, update update q(state, action) towards toward_target.
-        returns the old q(state,a) and the updated q(state, a) for all a.
-        """
-        self.agent.q.train()
-        self.optimizer.zero_grad()
-
-        old_q_values = self.agent.q(state.float())  # q(state, a) for all a
-        q_target = old_q_values.clone()
-        q_target[0][action] = toward_target
-
-        loss = torch.nn.functional.smooth_l1_loss(input=old_q_values, target=q_target)
-        loss.backward()
-        self.optimizer.step()
-
-        self.agent.q.eval()
-        new_q_values = self.agent.q(state.float())
-
-        return old_q_values.detach().numpy()[0], new_q_values.detach().numpy()[0]
-
-    def direction_of_change(self, old_values, new_values, action, thresh):
-        """
-        given a set of old and new q values, compare and see if similar/different actions were updated in
-        in the correct direction.
-
-        @:param
-            old_values, new_values are both np.array
-            old_values.shape = (env.action_space.n,)
-            new_values.shape = (num_updates, env.action_space.n)
-            action: the action (an int) whose q value was repeatedly updated
-            thresh: the threshold for counting some q value as changed
-
-        @:return
-            number of similar actions that are updated in the same direction
-            number of similar actions that are updated in the different direction
-            number of different actions that are updated in the same direction
-            number of different actions that are updated in the different direction
-        """
-        # identify similar & different actions
+    def run(self):
+        # number of actions
         num_total_actions = int(self.test_env.action_space.n)
         num_different_actions = int(num_total_actions / self.params['duplicate'])
-        similar_actions = range(int(action % num_different_actions), num_total_actions, num_different_actions)
-        diff_actions = np.delete(range(num_total_actions), similar_actions)
 
-        # get q values for similar & different actions
-        difference = new_values - old_values
-        similar_actions_values = np.take(difference, similar_actions, axis=-1)
-        diff_actions_values = np.take(difference, diff_actions, axis=-1)
-        assert similar_actions_values.shape == (len(difference), int(num_total_actions / num_different_actions))
-        assert (diff_actions_values.shape ==
-               (len(difference), num_total_actions - int(num_total_actions / num_different_actions)))
+        # figure out what are the possible actions
+        actions = list(range(num_total_actions))
 
-        # apply the thresh hold, ignore small changes
-        similar_actions_values = np.where(abs(similar_actions_values) > thresh, similar_actions_values, 0)
-        diff_actions_values = np.where(abs(diff_actions_values) > thresh, diff_actions_values, 0)
+        # get all states we care about
+        states = []
+        s, done = self.test_env.reset(), False
+        for _ in tqdm(range(self.params['n_gscore_states'])):
+            # figure out what the nest state is
+            action_taken = self.agent.act(s)
+            sp, r, done, _ = self.test_env.step(action_taken)
+            s = sp if not done else self.test_env.reset()
+            states.append(s)
 
-        # check if in right direction
-        num_same_dir_similar = sum(np.mean(similar_actions_values, axis=0) > 0) - 1
-        num_diff_dir_similar = sum(np.mean(similar_actions_values, axis=0) < 0)
-        num_same_dir_diff = sum(np.mean(diff_actions_values, axis=0) > 0)
-        num_diff_dir_diff = sum(np.mean(diff_actions_values, axis=0) < 0)
-        return num_same_dir_similar, num_diff_dir_similar, num_same_dir_diff, num_diff_dir_diff
+        # perform directed update for all states and actions
+        q_net = DirectedQNet(n_features=self.test_env.observation_space.shape[0],
+                             n_actions=self.test_env.action_space.n,
+                             n_hidden_layers=self.params['n_hidden_layers'],
+                             n_units_per_layer=self.params['n_units_per_layer'],
+                             lr=self.params['learning_rate'],
+                             optim=self.params['optimizer'])
+        q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
+
+        # write to csv of direction of change (both for an average state)
+        q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
+        assert q_deltas_avg.shape == (len(actions), num_total_actions)
+
+        with open(self.params['out_file'], 'w') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['number of similar actions that are updated in the same direction',
+                                 'number of similar actions that are updated in the different direction',
+                                 'number of different actions that are updated in the same direction',
+                                 'number of different actions that are updated in the different direction'])
+            for a in actions:
+                max_change = np.max(q_deltas_avg[a])
+                similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
+                    direction_of_change(q_deltas_avg[a], a, self.params['change_percentage_thresh'] * max_change,
+                                        num_total_actions, self.params['duplicate'])
+                csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
+
+        # plot the q_delta (for an average state)
+        if not self.params['test']:
+            q_deltas_first = q_deltas[0]
+            plt.figure()
+            for a in actions:  # for each action updated
+                plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
+                plot_q_delta(q_deltas_first[a], a)
+            plt.show()
+
+        # construct and plot the confusion matrix
+        cfn_mat_all_states = np.zeros((len(states),
+                                       self.test_env.action_space.n,
+                                       self.test_env.action_space.n))
+        for i, _ in enumerate(states):
+            cfn_mat_all_states[i, :, :] = build_confusion_matrix(q_deltas[i, :, :], self.params['duplicate'])
+        avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
+        plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
+        if not self.params['test']:
+            print(f"+g score: {plus_g} \n -g score: {minus_g}")
+            plot_confusion_matrix(avg_cfn_mat, self.params['duplicate'], len(states))
 
 
-def plot(old_values, new_values, action_idx):
+def direction_of_change(q_deltas, a, thresh, num_total_actions, num_dup_actions):
     """
-    given a set of old and new q values, plot them in a graph to compare
+    given q_delta, see if similar/different actions were updated in
+    in the correct direction.
+
+    @:param
+        q_deltas: q_deltas for one state, np arary of shape (env.action_space.n, )
+        a: the action (an int) whose q value was repeatedly updated
+        thresh: the threshold for counting some q value as changed
+
+    @:return
+        number of similar actions that are updated in the same direction
+        number of similar actions that are updated in the different direction
+        number of different actions that are updated in the same direction
+        number of different actions that are updated in the different direction
+    """
+    # identify similar & different actions
+    num_different_actions = int(num_total_actions / num_dup_actions)
+    similar_actions = range(int(a % num_different_actions), num_total_actions, num_different_actions)
+    diff_actions = np.delete(range(num_total_actions), similar_actions)
+
+    # get q values for similar & different actions
+    similar_actions_values = q_deltas[similar_actions]
+    diff_actions_values = q_deltas[diff_actions]
+    assert similar_actions_values.shape == (int(num_total_actions / num_different_actions),)
+    assert (diff_actions_values.shape ==
+            (num_total_actions - int(num_total_actions / num_different_actions),))
+
+    # apply the thresh hold, ignore small changes
+    similar_actions_values = np.where(abs(similar_actions_values) > thresh, similar_actions_values, 0)
+    diff_actions_values = np.where(abs(diff_actions_values) > thresh, diff_actions_values, 0)
+
+    # check if in right direction
+    num_same_dir_similar = sum(np.array(similar_actions_values) > 0) - 1
+    num_diff_dir_similar = sum(np.array(similar_actions_values) < 0)
+    num_same_dir_diff = sum(np.array(diff_actions_values) > 0)
+    num_diff_dir_diff = sum(np.array(diff_actions_values) < 0)
+    return num_same_dir_similar, num_diff_dir_similar, num_same_dir_diff, num_diff_dir_diff
+
+
+def plot_q_delta(q_deltas, action_idx):
+    """
+    given q_delta for one state for all actions, plot them in a graph to compare
     this function plots the change in q_values in one plot for one action
 
-    old_values.shape = (env.action_space.n,)
-    new_values.shape = (num_updates, env.action_space.n)
+    q_deltas.shape = (env.action_space.n,)
     """
-    n = len(old_values)
+    n = len(q_deltas)
     possible_actions = np.arange(n)
 
     # plot reference line at 0
     plt.plot(possible_actions, np.zeros_like(possible_actions), '--k')
 
     # plot only the latest new value
-    plt.plot(possible_actions, new_values[-1] - old_values)
+    plt.plot(possible_actions, q_deltas)
 
     plt.title('action {}'.format(action_idx))
     plt.xlabel('{} different actions'.format(n))
     plt.ylabel(r'$\Delta$q(s,a)')
 
 
-def build_confusion_matrix(q_deltas, num_duplicate):
-    """
-    builds a confusion matrix for the direction of the bumps in q_delta
-
-    :param
-        q_deltas (np.array): each row corresponds to the latest q_delta from one action
-                            shape = (num_actions, len(q_delta_for_one_action)) = (num_actions, num_actions)
-        num_duplicate: number of set of duplicate actions
-    :return
-           a confusion matrix, where row corresponds to the action being updated, and col in that row correspond to
-           the delta for that intervention.
-           The index is arranged so that similar actions are adjacent: (a1, a2, .., an, b1, b2, .., bn, ..)
-    """
-    # arrange index so similar actions are adjacent
-    num_actions = len(q_deltas)
-    num_original_actions = int(num_actions / num_duplicate)
-    new_idx = []
-    for i in range(num_original_actions):
-        new_idx += list(range(i, num_actions, num_original_actions))
-    assert len(new_idx) == num_actions
-    q_deltas = q_deltas[new_idx]
-
-    mat = np.zeros((num_actions, num_actions))
-    for action, q_delta in enumerate(q_deltas):
-        # normalize q_delta by min-max scaling to [0, 1]
-        q_delta = (q_delta - np.min(q_delta)) / (np.max(q_delta) - np.min(q_delta))
-        # put row in matrix
-        q_delta = q_delta[new_idx]
-        mat[action] = q_delta
-    return mat
-
-
 def main(test=False):
-    # hyper parameters for plotting
-    bogy_trial = Trial()
-    num_updates = bogy_trial.params['num_update']  # number of consecutive updates
-    delta_update = bogy_trial.params['delta_update']  # add this to the original q value each iteration of the update
-    # only changes past this percentage threshold are considered a change.
-    # this percentage is the percentage of the maximum increase the q value experienced.
-    change_percentage_thresh = bogy_trial.params['change_percentage_thresh']
-    num_total_actions = int(bogy_trial.test_env.action_space.n)
-    num_different_actions = int(num_total_actions / bogy_trial.params['duplicate'])
-    out_file_path = bogy_trial.params['out_file']
-
-    # prepare to plot, open csv to write to
-    if not test:
-        plt.figure()
-    metrics_out_file = open(out_file_path, 'w')
-    csv_writer = csv.writer(metrics_out_file)
-    csv_writer.writerow(['number of similar actions that are updated in the same direction',
-                         'number of similar actions that are updated in the different direction',
-                         'number of different actions that are updated in the same direction',
-                         'number of different actions that are updated in the different direction'])
-
-    # figure out what are the possible actions
-    actions = range(num_total_actions)
-
-    # accumulate q_delta for each action
-    q_deltas = []
-
-    # updates for each action
-    for a in actions:
-        # set up
-        trial = Trial(test=test)
-        s = trial.test_env.reset()  # one starting state
-        original_q_values = trial.original_q_values(s)  # q(s,a) for all a in actions
-
-        update_value = original_q_values[a] + delta_update
-        new_values = []
-        # update for a few consecutive times
-        for i in range(num_updates):
-            old_val, new_val = trial.dqn_directed_update(s, a, update_value)
-            new_values.append(new_val)
-            assert all(original_q_values) == all(old_val), "oops, original q values changes for some reason"
-        q_deltas.append(new_values[-1] - original_q_values)
-
-        # plot for current action
-        max_change = np.max(new_values) - original_q_values[a]
-        plt.subplot(int(num_total_actions / num_different_actions), num_different_actions, a + 1)
-        plot(original_q_values, new_values, a)
-
-        # get metric for current action (precision recall)
-        similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir = \
-            trial.direction_of_change(original_q_values, new_values, a,
-                                      thresh=change_percentage_thresh * max_change)
-        csv_writer.writerow([similar_act_same_dir, similar_act_diff_dir, diff_act_same_dir, diff_act_diff_dir])
-
-    # show plot, close csv
-    metrics_out_file.close()
-    if not test:
-        plt.show()
-
-    # construct and plot the confusion matrix
-    cm = build_confusion_matrix(np.array(q_deltas), bogy_trial.params['duplicate'])
-    if not test:
-        plt.figure()
-        plt.title(f"confusion matrix: {bogy_trial.params['duplicate']} sets of duplicate action")
-        plt.xlabel(r'normalized $\Delta$q(s,a)')
-        plt.ylabel("action being updated")
-        plt.imshow(cm)
-        plt.colorbar()
-        plt.show()
+    trial = ManipulationTrial(test=test)
+    trial.run()
 
 
 if __name__ == "__main__":

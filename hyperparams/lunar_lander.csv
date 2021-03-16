@@ -1,6 +1,8 @@
 max_env_steps,300000,int
 eval_every_n_steps,5000,int
+gscore_every_n_steps,1000,int
 n_eval_episodes,10,int
+n_gscore_states,100,int
 updates_per_env_step,1,int
 learning_rate,0.0001,float
 epsilon_final,0.05,float
