@@ -17,16 +17,16 @@ class ActionDQNAgent(DQNAgent):
             next_states = torch.stack(batch.next_state, dim=0).float()
             aps = []
             for s in next_states:
-                q_values = self._get_q_values_for_state(s).float()
-                ap = torch.argmax(q_values, dim=0)[0]
+                q_values = self._get_q_values_for_state(s).squeeze().float()
+                ap = torch.argmax(q_values, dim=0)
                 aps.append(ap)
             aps = torch.as_tensor(aps)
             aps_one_hot = one_hot(aps, self.action_space.n)
             assert aps_one_hot.shape == (len(aps), self.action_space.n)
-            vp = self.q_target(torch.cat([next_states, aps_one_hot], dim=-1).float())
+            vp = self.q_target(torch.cat([next_states, aps_one_hot], dim=-1).float()).squeeze(-1)
             not_done_idx = ~torch.stack(batch.done)
             targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx
-        return targets
+        return targets.unsqueeze(-1)
 
     def _get_q_predictions(self, batch):
         states = torch.stack(batch.state, dim=0).float()
