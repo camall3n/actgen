@@ -78,7 +78,7 @@ class Trial:
         if self.params['agent'] == 'dqn':
             self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
             self.agent.q.load(self.params['load'])
