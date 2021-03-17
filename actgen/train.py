@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import RandomAgent, DQNAgent, DirectedQNet
+from .agents import RandomAgent, DQNAgent, DirectedQNet, ActionDQNAgent
 from .utils import Experience
 from .gscore import calc_g_score, build_confusion_matrix
 
@@ -39,7 +39,7 @@ class Trial:
         parser.add_argument('--env_name', type=str, default='LunarLander-v2',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random'],
+                            choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
@@ -94,6 +94,8 @@ class Trial:
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
             self.agent = DQNAgent(env.observation_space, env.action_space, self.params)
+        elif self.params['agent'] == 'action_dqn':
+            self.agent = ActionDQNAgent(env.observation_space, env.action_space, self.params)
         self.best_score = -np.inf
 
         self.gscores = []

@@ -40,14 +40,8 @@ class DQNAgent():
         self.n_training_steps = 0
         assert len(self.observation_space.shape) == 1
         n_features = self.observation_space.shape[0]
-        self.q = QNet(n_features=n_features,
-                      n_actions=self.action_space.n,
-                      n_hidden_layers=self.params['n_hidden_layers'],
-                      n_units_per_layer=self.params['n_units_per_layer'])
-        self.q_target = QNet(n_features=n_features,
-                             n_actions=self.action_space.n,
-                             n_hidden_layers=self.params['n_hidden_layers'],
-                             n_units_per_layer=self.params['n_units_per_layer'])
+        self.q = self._make_qnet(n_features, action_space.n, self.params)
+        self.q_target = self._make_qnet(n_features, action_space.n, self.params)
         self.q_target.hard_copy_from(self.q)
         self.replay.reset()
         params = list(self.q.parameters())
@@ -62,7 +56,7 @@ class DQNAgent():
             a = self.action_space.sample()
         else:
             with torch.no_grad():
-                q_values = self.q(torch.as_tensor(x).float())
+                q_values = self._get_q_values_for_state(x)
                 a = torch.argmax(q_values, dim=-1)[0]
         return a
 
@@ -115,3 +109,12 @@ class DQNAgent():
         q_values = self.q(torch.stack(batch.state).float())
         q_acted = extract(q_values, idx=torch.stack(batch.action).long(), idx_dim=-1)
         return q_acted
+
+    def _get_q_values_for_state(self, x):
+        return self.q(torch.as_tensor(x).float())
+
+    def _make_qnet(self, n_features, n_actions, params):
+        return QNet(n_features=n_features,
+                    n_actions=n_actions,
+                    n_hidden_layers=params['n_hidden_layers'],
+                    n_units_per_layer=params['n_units_per_layer'])

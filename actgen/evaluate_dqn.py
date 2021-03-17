@@ -6,11 +6,10 @@ import numpy as np
 import gym
 import seeding
 import torch
-from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import RandomAgent, DQNAgent
+from .agents import DQNAgent, ActionDQNAgent
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,7 +33,7 @@ class Trial:
         parser.add_argument('--env_name', type=str, default='LunarLander-v2',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random'],
+                            choices=['dqn', 'action_dqn'],
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
@@ -76,12 +75,13 @@ class Trial:
         seeding.seed(1000+self.params['seed'], gym, test_env)
         self.test_env = test_env
 
-        assert self.params['agent'] == 'dqn'
-        self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        if self.params['agent'] == 'dqn':
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        elif self.params['agent'] == 'action_dqn':
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
             self.agent.q.load(self.params['load'])
-
 
     def teardown(self):
         pass

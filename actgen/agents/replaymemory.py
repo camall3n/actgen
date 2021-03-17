@@ -1,12 +1,9 @@
-from collections import namedtuple
 import random
-
-import torch
 
 from ..utils import Experience
 
-# Adapted from Pytorch docs
 
+# Adapted from Pytorch docs
 class ReplayMemory:
     def __init__(self, capacity):
         self.capacity = capacity
