@@ -116,7 +116,7 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s)
+                a = self.agent.act(s, testing=True)
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
