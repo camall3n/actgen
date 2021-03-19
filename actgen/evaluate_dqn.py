@@ -43,7 +43,7 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.csv',
+        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
                             help='Path to the saved model file')
         args, unknown = parser.parse_known_args()
         other_args = {
