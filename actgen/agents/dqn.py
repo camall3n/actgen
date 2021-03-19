@@ -57,7 +57,7 @@ class DQNAgent():
         else:
             with torch.no_grad():
                 q_values = self._get_q_values_for_state(x)
-                a = torch.argmax(q_values, dim=-1)[0]
+                a = torch.argmax(q_values.squeeze())
         return a
 
     def store(self, experience):
