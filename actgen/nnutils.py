@@ -92,6 +92,31 @@ class Network(torch.nn.Module):
         for theta_dest, theta_src in zip(self.parameters(), other.parameters()):
             theta_dest.data.copy_(tau * theta_src.data + (1.0 - tau) * theta_dest.data)
 
+
+class MLP(Network):
+    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer):
+        super().__init__()
+        self.n_inputs = n_inputs
+        self.n_outputs = n_outputs
+
+        assert n_hidden_layers >= 1
+
+        layers = [
+            Reshape(-1, n_inputs),
+            torch.nn.Linear(n_inputs, n_units_per_layer),
+            torch.nn.ReLU()
+        ] + [
+            torch.nn.Linear(n_units_per_layer, n_units_per_layer),
+            torch.nn.ReLU()
+        ] * (n_hidden_layers - 1) + [
+            torch.nn.Linear(n_units_per_layer, n_outputs)
+        ]
+        self.model = Sequential(*layers)
+
+    def forward(self, *args, **kwargs):
+        return self.model(*args, **kwargs)
+
+
 class Sequential(torch.nn.Sequential, Network):
     pass
 

@@ -1,7 +1,7 @@
 import torch
 
-from ..nnutils import one_hot
-from .dqn import DQNAgent, QNet
+from ..nnutils import one_hot, MLP
+from .dqn import DQNAgent
 
 
 class ActionDQNAgent(DQNAgent):
@@ -44,7 +44,7 @@ class ActionDQNAgent(DQNAgent):
         return self.q(qnet_input)
 
     def _make_qnet(self, n_features, n_actions, params):
-        return QNet(n_features=n_features+n_actions,
-                    n_actions=1,
-                    n_hidden_layers=params['n_hidden_layers'],
-                    n_units_per_layer=params['n_units_per_layer'])
+        return MLP(n_inputs=n_features+n_actions,
+                   n_outputs=1,
+                   n_hidden_layers=params['n_hidden_layers'],
+                   n_units_per_layer=params['n_units_per_layer'])

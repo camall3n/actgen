@@ -1,32 +1,8 @@
 import numpy as np
 import torch
 
-from ..nnutils import Network, Sequential, Reshape, extract
+from ..nnutils import Network, Sequential, Reshape, extract, MLP
 from .replaymemory import ReplayMemory
-
-
-class QNet(Network):
-    def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer):
-        super().__init__()
-        self.n_features = n_features
-        self.n_actions = n_actions
-
-        assert n_hidden_layers >= 1
-
-        layers = [
-            Reshape(-1, n_features),
-            torch.nn.Linear(n_features, n_units_per_layer),
-            torch.nn.ReLU()
-        ] + [
-            torch.nn.Linear(n_units_per_layer, n_units_per_layer),
-            torch.nn.ReLU()
-        ] * (n_hidden_layers - 1) + [
-            torch.nn.Linear(n_units_per_layer, n_actions)
-        ]
-        self.model = Sequential(*layers)
-
-    def forward(self, *args, **kwargs):
-        return self.model(*args, **kwargs)
 
 
 class DQNAgent():
@@ -114,7 +90,7 @@ class DQNAgent():
         return self.q(torch.as_tensor(x).float())
 
     def _make_qnet(self, n_features, n_actions, params):
-        return QNet(n_features=n_features,
-                    n_actions=n_actions,
-                    n_hidden_layers=params['n_hidden_layers'],
-                    n_units_per_layer=params['n_units_per_layer'])
+        return MLP(n_inputs=n_features,
+                   n_outputs=n_actions,
+                   n_hidden_layers=params['n_hidden_layers'],
+                   n_units_per_layer=params['n_units_per_layer'])

@@ -1,12 +1,13 @@
 import numpy as np
 import torch
 
-from .dqn import QNet
+from ..nnutils import MLP
 
 
-class DirectedQNet(QNet):
+class DirectedQNet(MLP):
     """
     this represents a Q network that we can manipulate directed update on certain q(s, a)
+    This Q network has a normal structure of (s) -> q(s, a) for all a
     """
     def __init__(self, n_features, n_actions, n_hidden_layers, n_units_per_layer, lr, optim='sgd'):
         super().__init__(n_features, n_actions, n_hidden_layers, n_units_per_layer)
@@ -29,7 +30,7 @@ class DirectedQNet(QNet):
             an np array of shape (len(states), len(actions), self.n_actions)
             each q_delta is a 1D array of (updated_q_val - original_q_val) for all possible actions in q_net
         """
-        q_delta = np.zeros((len(states), len(actions), self.n_actions))
+        q_delta = np.zeros((len(states), len(actions), self.n_outputs))
         for s_idx, s in enumerate(states):
             for a_idx, a in enumerate(actions):
                 # reset the q_net for each state
