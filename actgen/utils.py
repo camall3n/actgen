@@ -50,7 +50,7 @@ def every_n_times(n, count, callback, *args, final_count=None):
         callback(*args)
 
 
-def plot_training_gscore(fname='results/training_gscore_sgd.csv'):
+def plot_training_gscore(fname='results/training_gscore.csv'):
     """
     plot the +/- g score over time as training proceeds
     """

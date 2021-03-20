@@ -12,7 +12,7 @@ import torch
 
 from . import utils
 from . import wrappers as wrap
-from .agents import DQNAgent, DirectedQNet
+from .agents import DQNAgent, DirectedQNet, ActionDQNAgent
 from .gscore import plot_confusion_matrix, calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,7 @@ class ManipulationTrial:
         parser.add_argument('--env_name', type=str, default='LunarLander-v2',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random'],
+                            choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
@@ -84,8 +84,10 @@ class ManipulationTrial:
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
 
-        assert self.params['agent'] == 'dqn'
-        self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        if self.params['agent'] == 'dqn':
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        elif self.params['agent'] == 'action_dqn':
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
             print("loading model from ", self.params['load'])
@@ -113,11 +115,18 @@ class ManipulationTrial:
             states.append(s)
 
         # perform directed update for all states and actions
-        q_net = DirectedQNet(n_features=self.test_env.observation_space.shape[0],
-                             n_actions=self.test_env.action_space.n,
+        if self.params['agent'] == 'dqn':
+            n_inputs = self.test_env.observation_space.shape[0]
+            n_outputs = self.test_env.action_space.n
+        if self.params['agent'] == 'action_dqn':
+            n_inputs = self.test_env.observation_space.shape[0] + self.test_env.action_space.n
+            n_outputs = 1
+        q_net = DirectedQNet(n_inputs=n_inputs,
+                             n_outputs=n_outputs,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
+                             agent_type=self.params['agent'],
                              optim=self.params['optimizer'])
         q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
 

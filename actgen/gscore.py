@@ -46,8 +46,8 @@ def calc_g_score(avg_confusion_mat, num_duplicate):
     num_actions = len(avg_confusion_mat)
     num_original_actions = int(num_actions / num_duplicate)
     # matrix diagonal should be all 1's
-    for i in range(num_actions):
-        assert avg_confusion_mat[i, i] == 1
+    # for i in range(num_actions):
+        # assert avg_confusion_mat[i, i] == 1
 
     # get plus_g score
     plus_g_sum = 0

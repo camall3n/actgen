@@ -132,11 +132,18 @@ class Trial:
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
-        q_net = DirectedQNet(n_features=self.env.observation_space.shape[0],
-                             n_actions=self.env.action_space.n,
+        if self.params['agent'] == 'dqn':
+            n_inputs = self.env.observation_space.shape[0]
+            n_outputs = self.env.action_space.n
+        if self.params['agent'] == 'action_dqn':
+            n_inputs = self.env.observation_space.shape[0] + self.env.action_space.n
+            n_outputs = 1
+        q_net = DirectedQNet(n_inputs=n_inputs,
+                             n_outputs=n_outputs,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
+                             agent_type=self.params['agent'],
                              optim=self.params['optimizer'])
 
         # perform directed q-update for each action, across multiple states
