@@ -1,5 +1,5 @@
 import logging
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import csv
 from pydoc import locate
 
