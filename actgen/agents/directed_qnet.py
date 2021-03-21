@@ -48,6 +48,7 @@ class DirectedQNet(MLP):
                     # update for normal DQN
                     if self.agent_type == 'dqn':
                         original_q_values = self.forward(s.float())
+                        q_target = original_q_values.clone()
                         q_target[0][a] = float(original_q_values[0][a]) + delta_update
 
                         get_current_q_vals = lambda s: self.forward(s.float())
@@ -56,6 +57,7 @@ class DirectedQNet(MLP):
                     elif self.agent_type == 'action_dqn':
                         one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()
                         original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
+                        q_target = original_q_values.clone()
                         q_target[0] = float(original_q_values[0]) + delta_update
 
                         get_current_q_vals = lambda s: self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
