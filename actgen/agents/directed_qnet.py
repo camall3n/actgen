@@ -9,7 +9,7 @@ class DirectedQNet(MLP):
     this represents a Q network that we can manipulate directed update on certain q(s, a)
     This Q network has a normal structure of (s) -> q(s, a) for all a
     """
-    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, 
+    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer,
                  lr, agent_type, optim='sgd'):
         super().__init__(n_inputs, n_outputs, n_hidden_layers, n_units_per_layer)
         assert optim in ['sgd', 'adam']
@@ -43,51 +43,41 @@ class DirectedQNet(MLP):
                 if self.optim == 'adam':
                     optimizer = torch.optim.Adam(list(self.parameters()), lr=self.lr)
 
-                # update for normal DQN
-                if self.agent_type == 'dqn':
-                    # get q_target
-                    with torch.no_grad():
+                # get q_target
+                with torch.no_grad():
+                    # update for normal DQN
+                    if self.agent_type == 'dqn':
                         original_q_values = self.forward(s.float())
                         q_target = original_q_values.clone()
                         q_target[0][a] = float(original_q_values[0][a]) + delta_update
 
-                    # perform updates for q(s, a)
-                    self.train()
-                    for i in range(n_updates):
-                        current_q_vals = self.forward(s.float())  # q(s, a') for all a'
+                        get_current_q_vals = lambda s: self.forward(s.float())
 
-                        optimizer.zero_grad()
-                        loss = torch.nn.functional.smooth_l1_loss(input=current_q_vals, target=q_target)
-                        loss.backward()
-                        optimizer.step()
-
-                    self.eval()
-                    new_q_values = self.forward(s.float())
-                    q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy()[0] - original_q_values.detach().numpy()[0]
-                
-                # udpate for flipped DQN
-                elif self.agent_type == 'action_dqn':
-
-                    one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()
-
-                    # get q_target
-                    with torch.no_grad():
+                    # update for flipped DQN
+                    elif self.agent_type == 'action_dqn':
+                        one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()
                         original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
                         q_target = original_q_values.clone()
                         q_target[0] = float(original_q_values[0]) + delta_update
-                    
-                    # perform udpates for q(s, a)
-                    self.train()
-                    for i in range(n_updates):
-                        current_q_val = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
 
-                        optimizer.zero_grad()
-                        loss = torch.nn.functional.smooth_l1_loss(input=current_q_val, target=q_target)
-                        loss.backward()
-                        optimizer.step()
-                    
+                        get_current_q_vals = lambda s: self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
+
+                # perform updates for q(s, a)
+                self.train()
+                for i in range(n_updates):
+                    current_q_vals = get_current_q_vals(s)
+
+                    optimizer.zero_grad()
+                    loss = torch.nn.functional.smooth_l1_loss(input=current_q_vals, target=q_target)
+                    loss.backward()
+                    optimizer.step()
+
+                self.eval()
+                if self.agent_type == 'dqn':
+                    new_q_values = self.forward(s.float())
+                    q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy()[0] - original_q_values.detach().numpy()[0]
+                elif self.agent_type == 'action_dqn':
                     # new q(s, a) for all a
-                    self.eval()
                     states = torch.as_tensor(s).float().repeat(len(actions), 1)
                     assert states.shape == (len(actions), len(s))
                     qnet_input = torch.cat([states, torch.eye(len(actions))], dim=-1).float()
