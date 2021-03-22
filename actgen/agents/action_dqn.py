@@ -44,7 +44,10 @@ class ActionDQNAgent(DQNAgent):
         return self.q(qnet_input)
 
     def _make_qnet(self, n_features, n_actions, params):
+        use_dropout = 'dropout' in params['regularization']
         return MLP(n_inputs=n_features+n_actions,
                    n_outputs=1,
                    n_hidden_layers=params['n_hidden_layers'],
-                   n_units_per_layer=params['n_units_per_layer'])
+                   n_units_per_layer=params['n_units_per_layer'],
+                   use_dropout=use_dropout,
+                   dropout_rate=params['dropout_rate'])

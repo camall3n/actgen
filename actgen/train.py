@@ -41,6 +41,9 @@ class Trial:
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
+        parser.add_argument('--regularization', type=str, default='None',
+                            choices=['None', 'l1', 'l2', 'l1_l2', 'dropout', 'l1_dropout', 'l2_dropout', 'l1_l2_dropout'],
+                            help='what regularization method to use during training')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,

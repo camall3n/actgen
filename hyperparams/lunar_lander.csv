@@ -14,3 +14,6 @@ n_units_per_layer,256,int
 target_copy_tau,0.01,float
 replay_warmup_steps,5000,int
 replay_buffer_size,250000,int
+regularization_weight_l1,1,float
+regularization_weight_l2,1,float
+dropout_rate,0.3,float
