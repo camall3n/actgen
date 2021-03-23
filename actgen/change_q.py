@@ -54,9 +54,6 @@ class ManipulationTrial:
                             help='only changes past this percentage are considered when computing the metrics')
         parser.add_argument('--optimizer', type=str, default='sgd',
                             help='Which optimizer to use when manipulating q values')
-        parser.add_argument('--regularization', type=str, default='None',
-                            choices=['None', 'l1', 'l2', 'l1_l2', 'dropout', 'l1_dropout', 'l2_dropout', 'l1_l2_dropout'],
-                            help='what regularization method to use during training')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
