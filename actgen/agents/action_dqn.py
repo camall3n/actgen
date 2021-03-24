@@ -8,8 +8,8 @@ class ActionDQNAgent(DQNAgent):
     def __init__(self, observation_space, action_space, params):
         super().__init__(observation_space, action_space, params)
 
-    def save(self, is_best, seed):
-        self.q.save('action_qnet' + f'_seed{seed}', 'results/', is_best)
+    def save(self, is_best, seed, regularizer):
+        self.q.save('action_qnet' + f'_seed{seed}_' + regularizer, 'results/', is_best)
 
     def _get_q_targets(self, batch):
         with torch.no_grad():
