@@ -8,8 +8,8 @@ class ActionDQNAgent(DQNAgent):
     def __init__(self, observation_space, action_space, params):
         super().__init__(observation_space, action_space, params)
 
-    def save(self, is_best, seed):
-        self.q.save('action_qnet' + f'_seed{seed}', 'results/', is_best)
+    def save(self, is_best, seed, regularizer):
+        self.q.save('action_qnet' + f'_seed{seed}_' + regularizer, 'results/', is_best)
 
     def _get_q_targets(self, batch):
         with torch.no_grad():
@@ -44,7 +44,10 @@ class ActionDQNAgent(DQNAgent):
         return self.q(qnet_input)
 
     def _make_qnet(self, n_features, n_actions, params):
+        use_dropout = 'regularization' in params and 'dropout' in params['regularization']
         return MLP(n_inputs=n_features+n_actions,
                    n_outputs=1,
                    n_hidden_layers=params['n_hidden_layers'],
-                   n_units_per_layer=params['n_units_per_layer'])
+                   n_units_per_layer=params['n_units_per_layer'],
+                   use_dropout=use_dropout,
+                   dropout_rate=params['dropout_rate'])

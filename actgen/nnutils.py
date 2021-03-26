@@ -94,23 +94,38 @@ class Network(torch.nn.Module):
 
 
 class MLP(Network):
-    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer):
+    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, 
+                use_dropout=False, dropout_rate=0.5):
         super().__init__()
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
 
         assert n_hidden_layers >= 1
-
-        layers = [
-            Reshape(-1, n_inputs),
-            torch.nn.Linear(n_inputs, n_units_per_layer),
-            torch.nn.ReLU()
-        ] + [
-            torch.nn.Linear(n_units_per_layer, n_units_per_layer),
-            torch.nn.ReLU()
-        ] * (n_hidden_layers - 1) + [
-            torch.nn.Linear(n_units_per_layer, n_outputs)
-        ]
+        
+        if use_dropout:
+            layers = [
+                Reshape(-1, n_inputs),
+                torch.nn.Linear(n_inputs, n_units_per_layer),
+                torch.nn.ReLU(),
+                torch.nn.Dropout(dropout_rate)
+            ] + [
+                torch.nn.Linear(n_units_per_layer, n_units_per_layer),
+                torch.nn.ReLU(),
+                torch.nn.Dropout(dropout_rate)
+            ] * (n_hidden_layers - 1) + [
+                torch.nn.Linear(n_units_per_layer, n_outputs)
+            ]
+        else:
+            layers = [
+                Reshape(-1, n_inputs),
+                torch.nn.Linear(n_inputs, n_units_per_layer),
+                torch.nn.ReLU()
+            ] + [
+                torch.nn.Linear(n_units_per_layer, n_units_per_layer),
+                torch.nn.ReLU()
+            ] * (n_hidden_layers - 1) + [
+                torch.nn.Linear(n_units_per_layer, n_outputs)
+            ]
         self.model = Sequential(*layers)
 
     def forward(self, *args, **kwargs):

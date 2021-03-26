@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from ..nnutils import Network, Sequential, Reshape, extract, MLP
+from ..nnutils import extract, MLP
 from .replaymemory import ReplayMemory
 
 
@@ -23,8 +23,8 @@ class DQNAgent():
         params = list(self.q.parameters())
         self.optimizer = torch.optim.Adam(params, lr=self.params['learning_rate'])
 
-    def save(self, is_best, seed):
-        self.q.save('qnet' + f'_seed{seed}', 'results/', is_best)
+    def save(self, is_best, seed, regularizer):
+        self.q.save('qnet' + f'_seed{seed}_' + regularizer, 'results/', is_best)
 
     def act(self, x, testing=False):
         if ((len(self.replay) < self.params['replay_warmup_steps']
@@ -52,6 +52,11 @@ class DQNAgent():
         q_targets = self._get_q_targets(batch)
 
         loss = torch.nn.functional.smooth_l1_loss(input=q_values, target=q_targets)
+        param = torch.cat([x.view(-1) for x in self.q.parameters()])
+        if 'l1' in self.params['regularization']:
+            loss += self.params['regularization_weight_l1'] * torch.norm(param, 1)
+        elif 'l2' in self.params['regularization']:
+            loss += self.params['regularization_weight_l2'] * torch.norm(param, 2) ** 2
         loss.backward()
         self.optimizer.step()
 
@@ -90,7 +95,10 @@ class DQNAgent():
         return self.q(torch.as_tensor(x).float())
 
     def _make_qnet(self, n_features, n_actions, params):
+        use_dropout = 'regularization' in params and 'dropout' in params['regularization']
         return MLP(n_inputs=n_features,
                    n_outputs=n_actions,
                    n_hidden_layers=params['n_hidden_layers'],
-                   n_units_per_layer=params['n_units_per_layer'])
+                   n_units_per_layer=params['n_units_per_layer'],
+                   use_dropout=use_dropout,
+                   dropout_rate=params['dropout_rate'])
