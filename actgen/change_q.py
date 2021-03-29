@@ -54,6 +54,8 @@ class ManipulationTrial:
                             help='only changes past this percentage are considered when computing the metrics')
         parser.add_argument('--optimizer', type=str, default='sgd',
                             help='Which optimizer to use when manipulating q values')
+        parser.add_argument('--other_same', default=False, action='store_true',
+                            help='whether to specify to keep the q-value of other actions the same')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -127,7 +129,8 @@ class ManipulationTrial:
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
-                             optim=self.params['optimizer'])
+                             optim=self.params['optimizer'],
+                             other_same=self.params['other_same'])
         q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
 
         # write to csv of direction of change (both for an average state)
