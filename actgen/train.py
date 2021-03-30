@@ -145,8 +145,8 @@ class Trial:
         file_name = self.params['agent'] + '_' \
                     + 'seed' + str(self.params['seed']) + '_' \
                     + regularizer
-        tag_dir = self.params['tag'] + '/'
-        self.agent.save(is_best, file_name, self.params['results_dir'], tag_dir)
+        dir = self.params['results_dir'] + self.params['tag'] + '/'
+        self.agent.save(file_name, dir, is_best)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
