@@ -133,14 +133,20 @@ class Trial:
             is_best = True
         else:
             is_best = False
-        regularizer = self.params['regularization']
-        if 'l1' in self.params['regularization']:
-            regularizer += "_" + str(self.params['regularization_weight_l1'])
-        if 'l2' in self.params['regularization']:
-            regularizer += "_" + str(self.params['regularization_weight_l2'])
-        if 'dropout' in self.params['regularization']:
-            regularizer += "_" + str(self.params['dropout_rate'])
-        self.agent.save(is_best, self.params['seed'], regularizer)
+        # saving the model file
+        if self.params['regularization'] == 'l1':
+            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l1'])
+        elif self.params['regularization'] == 'l2':
+            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l2'])
+        elif self.params['regularization'] == 'dropout':
+            regularizer = self.params['regularization'] + "_" + str(self.params['dropout_rate'])
+        else:
+            regularizer = 'none'
+        file_name = self.params['agent'] + '_' \
+                    + 'seed' + str(self.params['seed']) + '_' \
+                    + regularizer
+        tag_dir = self.params['tag'] + '/'
+        self.agent.save(is_best, file_name, self.params['results_dir'], tag_dir)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
