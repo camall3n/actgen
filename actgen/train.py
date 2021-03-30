@@ -60,7 +60,7 @@ class Trial:
                             help='Calculate the g-score vs time as training proceeds')
         parser.add_argument('--optimizer', type=str, default='sgd',
                             help='Which optimizer to use when manipulating q values')
-        parser.add_argument('--other_same', default=False, action='store_true',
+        parser.add_argument('--pin_other_q_values', default=False, action='store_true',
                             help='whether to specify to keep the q-value of other actions the same')
         args, unknown = parser.parse_known_args()
         other_args = {
@@ -157,7 +157,7 @@ class Trial:
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
                              optim=self.params['optimizer'],
-                             other_same=self.params['other_same'])
+                             pin_other_q_values=self.params['pin_other_q_values'])
 
         # perform directed q-update for each action, across multiple states
         actions = list(range(self.test_env.action_space.n))

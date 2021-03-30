@@ -10,14 +10,14 @@ class DirectedQNet(MLP):
     This Q network has a normal structure of (s) -> q(s, a) for all a
     """
     def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer,
-                 lr, agent_type, other_same, optim='sgd'):
+                 lr, agent_type, pin_other_q_values, optim='sgd'):
         super().__init__(n_inputs, n_outputs, n_hidden_layers, n_units_per_layer)
         assert optim in ['sgd', 'adam']
         self.optim = optim
         self.lr = lr
         assert agent_type in ['dqn', 'action_dqn']
         self.agent_type = agent_type
-        self.other_same = other_same
+        self.pin_other_q_values = pin_other_q_values
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
@@ -52,7 +52,7 @@ class DirectedQNet(MLP):
                         q_target = original_q_values.clone()
                         q_target[0][a] = float(original_q_values[0][a]) + delta_update
 
-                        if self.other_same:
+                        if self.pin_other_q_values:
                             get_current_q_vals = lambda s: self.forward(s.float())
                         else:
                             a = torch.as_tensor([a])
@@ -64,7 +64,7 @@ class DirectedQNet(MLP):
                         one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()
                         original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
 
-                        if self.other_same:
+                        if self.pin_other_q_values:
                             def get_current_q_vals(s):
                                 ss = torch.as_tensor(s).float().repeat(len(actions), 1)
                                 assert ss.shape == (len(actions), len(s))
