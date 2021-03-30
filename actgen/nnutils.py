@@ -101,31 +101,22 @@ class MLP(Network):
         self.n_outputs = n_outputs
 
         assert n_hidden_layers >= 1
+
+        add_dropout_if_enabled = torch.nn.Dropout if dropout else torch.nn.Identity
         
-        if dropout:
-            layers = [
-                Reshape(-1, n_inputs),
-                torch.nn.Linear(n_inputs, n_units_per_layer),
-                torch.nn.ReLU(),
-                torch.nn.Dropout(dropout)
-            ] + [
-                torch.nn.Linear(n_units_per_layer, n_units_per_layer),
-                torch.nn.ReLU(),
-                torch.nn.Dropout(dropout)
-            ] * (n_hidden_layers - 1) + [
-                torch.nn.Linear(n_units_per_layer, n_outputs)
-            ]
-        else:
-            layers = [
-                Reshape(-1, n_inputs),
-                torch.nn.Linear(n_inputs, n_units_per_layer),
-                torch.nn.ReLU()
-            ] + [
-                torch.nn.Linear(n_units_per_layer, n_units_per_layer),
-                torch.nn.ReLU()
-            ] * (n_hidden_layers - 1) + [
-                torch.nn.Linear(n_units_per_layer, n_outputs)
-            ]
+        layers = [
+            Reshape(-1, n_inputs),
+            torch.nn.Linear(n_inputs, n_units_per_layer),
+            torch.nn.ReLU(),
+            add_dropout_if_enabled(dropout)
+        ] + [
+            torch.nn.Linear(n_units_per_layer, n_units_per_layer),
+            torch.nn.ReLU(),
+            add_dropout_if_enabled(dropout)
+        ] * (n_hidden_layers - 1) + [
+            torch.nn.Linear(n_units_per_layer, n_outputs)
+        ]
+
         self.model = Sequential(*layers)
 
     def forward(self, *args, **kwargs):
