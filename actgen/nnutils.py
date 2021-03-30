@@ -95,23 +95,23 @@ class Network(torch.nn.Module):
 
 class MLP(Network):
     def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, 
-                use_dropout=False, dropout_rate=0.5):
+                dropout=False):
         super().__init__()
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
 
         assert n_hidden_layers >= 1
         
-        if use_dropout:
+        if dropout:
             layers = [
                 Reshape(-1, n_inputs),
                 torch.nn.Linear(n_inputs, n_units_per_layer),
                 torch.nn.ReLU(),
-                torch.nn.Dropout(dropout_rate)
+                torch.nn.Dropout(dropout)
             ] + [
                 torch.nn.Linear(n_units_per_layer, n_units_per_layer),
                 torch.nn.ReLU(),
-                torch.nn.Dropout(dropout_rate)
+                torch.nn.Dropout(dropout)
             ] * (n_hidden_layers - 1) + [
                 torch.nn.Linear(n_units_per_layer, n_outputs)
             ]

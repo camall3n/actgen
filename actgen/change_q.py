@@ -22,6 +22,7 @@ class ManipulationTrial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
+        self.params['regularization'] = 'None'
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
