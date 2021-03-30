@@ -53,9 +53,9 @@ class DQNAgent():
 
         loss = torch.nn.functional.smooth_l1_loss(input=q_values, target=q_targets)
         param = torch.cat([x.view(-1) for x in self.q.parameters()])
-        if 'l1' in self.params['regularization']:
+        if self.params['regularization'] == 'l1':
             loss += self.params['regularization_weight_l1'] * torch.norm(param, 1)
-        elif 'l2' in self.params['regularization']:
+        elif self.params['regularization'] == 'l2':
             loss += self.params['regularization_weight_l2'] * torch.norm(param, 2) ** 2
         loss.backward()
         self.optimizer.step()
