@@ -48,21 +48,19 @@ class DirectedQNet(MLP):
                 with torch.no_grad():
                     # update for normal DQN
                     if self.agent_type == 'dqn':
-                        original_q_values = self.forward(s.float())
-                        q_target = original_q_values.clone()
-                        q_target[0][a] = float(original_q_values[0][a]) + delta_update
+                        original_q_values = self.forward(s.float())  # (1, n_actions)
+                        q_target = original_q_values.clone()  # (1, n_actions)
+                        q_target[0][a] = float(original_q_values[0][a]) + delta_update  # (1, n_actions)
 
                         if self.pin_other_q_values:
-                            get_current_q_vals = lambda s: self.forward(s.float())
+                            get_current_q_vals = lambda s: self.forward(s.float())  # (1, n_actions)
                         else:
-                            a = torch.as_tensor([a])
-                            q_target = extract(q_target, a, idx_dim=-1)
-                            get_current_q_vals = lambda s: extract(self.forward(s.float()), a, idx_dim=-1)
+                            a = torch.as_tensor([a])  #(1)
+                            q_target = extract(q_target, a, idx_dim=-1)  # (1)
+                            get_current_q_vals = lambda s: extract(self.forward(s.float()), a, idx_dim=-1)  # (1)
 
                     # update for flipped DQN
                     elif self.agent_type == 'action_dqn':
-                        one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()
-                        original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
 
                         if self.pin_other_q_values:
                             def get_current_q_vals(s):
@@ -70,12 +68,15 @@ class DirectedQNet(MLP):
                                 assert ss.shape == (len(actions), len(s))
                                 qnet_input = torch.cat([ss, torch.eye(len(actions)).float()], dim=-1).float()
                                 return self.forward(qnet_input)
-                            q_target = get_current_q_vals(s)
+                            original_q_values = get_current_q_vals(s)  # (n_actions, 1)
+                            q_target = original_q_values.clone()  # (n_actions, 1)
                             q_target[a][0] = float(q_target[a][0]) + delta_update
                         else:
-                            get_current_q_vals = lambda s: self.forward(torch.cat([s.float(), one_hot_a], dim=-1))
-                            q_target = original_q_values.clone()
-                            q_target[0] = float(original_q_values[0]) + delta_update
+                            one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()  # (n_actions)
+                            original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))  # (1, 1)
+                            get_current_q_vals = lambda s: self.forward(torch.cat([s.float(), one_hot_a], dim=-1))  # (1, 1)
+                            q_target = original_q_values.clone()  # (1, 1)
+                            q_target[0, 0] = float(original_q_values[0, 0]) + delta_update
 
                 # perform updates for q(s, a)
                 self.train()
@@ -89,16 +90,16 @@ class DirectedQNet(MLP):
 
                 self.eval()
                 if self.agent_type == 'dqn':
-                    new_q_values = self.forward(s.float())
-                    q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy()[0] - original_q_values.detach().numpy()[0]
+                    new_q_values = self.forward(s.float())  # (1, n_actions)
                 elif self.agent_type == 'action_dqn':
                     # new q(s, a) for all a
-                    states = torch.as_tensor(s).float().repeat(len(actions), 1)
+                    states = torch.as_tensor(s).float().repeat(len(actions), 1)  # (n_actions, dim_state_space)
                     assert states.shape == (len(actions), len(s))
-                    qnet_input = torch.cat([states, torch.eye(len(actions))], dim=-1).float()
-                    new_q_values = self.forward(qnet_input).squeeze()
+                    qnet_input = torch.cat([states, torch.eye(len(actions))], dim=-1).float()  # (n_actions, dim_state_space + n_actions)
+                    new_q_values = self.forward(qnet_input).squeeze()  # (n_actions)
                     assert new_q_values.shape == (len(actions), )
-                    q_delta[s_idx, a_idx, :] = (new_q_values.detach().numpy() - original_q_values.detach().numpy()).squeeze()
+                # update q_delta matrix
+                q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy().squeeze() - original_q_values.detach().numpy().squeeze()
         return q_delta
 
     def forward(self, *args, **kwargs):
