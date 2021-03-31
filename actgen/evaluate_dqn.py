@@ -30,7 +30,7 @@ class Trial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
+        parser.add_argument('--env_name', type=str, default='CartPole-v0',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'action_dqn'],
@@ -43,7 +43,7 @@ class Trial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
+        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
                             help='Path to the saved model file')
         args, unknown = parser.parse_known_args()
         other_args = {

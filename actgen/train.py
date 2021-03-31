@@ -36,7 +36,7 @@ class Trial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
+        parser.add_argument('--env_name', type=str, default='CartPole-v0',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
@@ -48,20 +48,16 @@ class Trial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=1,
-                            help='when calculating gscore: Number of times to update a particular action q value')
-        parser.add_argument('--delta_update', '-u', type=float, default=10.0,
-                            help='when calculating gscore: increase the q value by this much for every update applied')
         parser.add_argument('--gscore', default=False, action='store_true',
                             help='Calculate the g-score vs time as training proceeds')
-        parser.add_argument('--optimizer', type=str, default='sgd',
-                            help='Which optimizer to use when manipulating q values')
-        parser.add_argument('--pin_other_q_values', default=False, action='store_true',
-                            help='whether to specify to keep the q-value of other actions the same')
+        parser.add_argument('--results_dir', type=str, default='./results/',
+                            help='Path to the result directory to save model files')
+        parser.add_argument('--tag', type=str, default='default_exp',
+                            help='A tag for the current experiment, used as a subdirectory name for saving models')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -103,6 +99,19 @@ class Trial:
             self.agent = ActionDQNAgent(env.observation_space, env.action_space, self.params)
         self.best_score = -np.inf
 
+        if self.params['regularization'] == 'l1':
+            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l1'])
+        elif self.params['regularization'] == 'l2':
+            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l2'])
+        elif self.params['regularization'] == 'dropout':
+            regularizer = self.params['regularization'] + "_" + str(self.params['dropout_rate'])
+        else:
+            regularizer = 'none'
+        self.file_name = self.params['agent'] + '_' \
+                    + 'seed' + str(self.params['seed']) + '_' \
+                    + regularizer
+        self.dir = self.params['results_dir'] + self.params['tag'] + '/'
+
         self.gscores = []
 
     def teardown(self):
@@ -134,19 +143,7 @@ class Trial:
         else:
             is_best = False
         # saving the model file
-        if self.params['regularization'] == 'l1':
-            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l1'])
-        elif self.params['regularization'] == 'l2':
-            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l2'])
-        elif self.params['regularization'] == 'dropout':
-            regularizer = self.params['regularization'] + "_" + str(self.params['dropout_rate'])
-        else:
-            regularizer = 'none'
-        file_name = self.params['agent'] + '_' \
-                    + 'seed' + str(self.params['seed']) + '_' \
-                    + regularizer
-        dir = self.params['results_dir'] + self.params['tag'] + '/'
-        self.agent.save(file_name, dir, is_best)
+        self.agent.save(self.file_name, self.dir, is_best)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
@@ -162,7 +159,7 @@ class Trial:
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
-                             optim=self.params['optimizer'],
+                             optim=self.params['gscore_optimizer'],
                              pin_other_q_values=self.params['pin_other_q_values'])
 
         # perform directed q-update for each action, across multiple states
@@ -191,7 +188,7 @@ class Trial:
         self.gscores.append((step, plus_g, minus_g))
 
     def save_gscores(self):
-        with open("results/training_gscore.csv", 'w') as f:
+        with open(self.dir + self.file_name + "_training_gscore.csv", 'w') as f:
             csv_writer = csv.writer(f)
             for g in self.gscores:
                 csv_writer.writerow([g[0], g[1], g[2]])
@@ -212,7 +209,7 @@ class Trial:
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
-        self.save_gscores()
+                self.save_gscores()
         self.teardown()
 
 

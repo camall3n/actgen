@@ -17,5 +17,8 @@ replay_buffer_size,250000,int
 regularization_weight_l1,1,float
 regularization_weight_l2,1,float
 dropout_rate,0,float
-results_dir,./results/,str
-tag,lander,str
+num_update,1,int
+delta_update,10.0,float
+change_percentage_thresh,0.10,float
+gscore_optimizer,sgd,str
+pin_other_q_values,True,str

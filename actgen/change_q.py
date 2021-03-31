@@ -30,7 +30,7 @@ class ManipulationTrial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
+        parser.add_argument('--env_name', type=str, default='CartPole-v0',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
@@ -39,24 +39,18 @@ class ManipulationTrial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
-        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
-                            help='Path to a saved model that"s fully trained')
-        parser.add_argument('--out_file', type=str, default='results/change_q_metric.csv',
-                            help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=1,
-                            help='Number of times to update a particular action q value')
-        parser.add_argument('--delta_update', '-u', type=float, default=10.0,
-                            help='increase the q value by this much for every update applied')
-        parser.add_argument('--change_percentage_thresh', '-p', type=float, default=0.10,
-                            help='only changes past this percentage are considered when computing the metrics')
-        parser.add_argument('--optimizer', type=str, default='sgd',
-                            help='Which optimizer to use when manipulating q values')
-        parser.add_argument('--pin_other_q_values', default=False, action='store_true',
-                            help='whether to specify to keep the q-value of other actions the same')
+        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
+                            help='Path to a saved model that"s fully trained')
+        parser.add_argument('--out_file', type=str, default='change_q_metric.csv',
+                            help='Path to a output file to write to that will contain the computed metrics')
+        parser.add_argument('--results_dir', type=str, default='./results/',
+                            help='Path to the result directory to save model files')
+        parser.add_argument('--tag', type=str, default='default_exp',
+                            help='A tag for the current experiment, used as a subdirectory name for saving models')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -130,7 +124,7 @@ class ManipulationTrial:
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
-                             optim=self.params['optimizer'],
+                             optim=self.params['gscore_optimizer'],
                              pin_other_q_values=self.params['pin_other_q_values'])
         q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
 
@@ -138,7 +132,7 @@ class ManipulationTrial:
         q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
         assert q_deltas_avg.shape == (len(actions), num_total_actions)
 
-        with open(self.params['out_file'], 'w') as f:
+        with open(self.params['results_dir'] + self.params['tag'] + self.params['out_file'], 'w') as f:
             csv_writer = csv.writer(f)
             csv_writer.writerow(['number of similar actions that are updated in the same direction',
                                  'number of similar actions that are updated in the different direction',
