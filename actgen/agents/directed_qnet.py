@@ -17,7 +17,7 @@ class DirectedQNet(MLP):
         self.lr = lr
         assert agent_type in ['dqn', 'action_dqn']
         self.agent_type = agent_type
-        self.pin_other_q_values = pin_other_q_values == 'True'
+        self.pin_other_q_values = pin_other_q_values
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
