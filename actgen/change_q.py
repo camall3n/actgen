@@ -136,7 +136,7 @@ class ManipulationTrial:
         q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
         assert q_deltas_avg.shape == (len(actions), num_total_actions)
 
-        with open(self.params['dir'] + self.params['out_file'], 'w') as f:
+        with open(self.experiment_dir + self.params['out_file'], 'w') as f:
             csv_writer = csv.writer(f)
             csv_writer.writerow(['number of similar actions that are updated in the same direction',
                                  'number of similar actions that are updated in the different direction',
@@ -167,7 +167,7 @@ class ManipulationTrial:
         avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
         plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
         if not self.params['test']:
-            print(f"+g score: {plus_g} \n -g score: {minus_g}")
+            print(f"+g score: {plus_g} \n-g score: {minus_g}")
             plot_confusion_matrix(avg_cfn_mat, self.params['duplicate'], len(states))
 
 
