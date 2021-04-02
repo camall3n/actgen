@@ -112,6 +112,8 @@ class Trial:
                     + regularizer
         self.dir = self.params['results_dir'] + self.params['tag'] + '/'
 
+        utils.save_hyperparams(self.dir+self.file_name+'_hyperparams.csv', self.params)
+
         self.gscores = []
 
     def teardown(self):

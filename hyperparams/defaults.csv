@@ -21,4 +21,4 @@ num_update,1,int
 delta_update,10.0,float
 change_percentage_thresh,0.10,float
 gscore_optimizer,sgd,str
-pin_other_q_values,True,str
+pin_other_q_values,True,bool

@@ -1,6 +1,7 @@
-import logging
 from collections import namedtuple, defaultdict
 import csv
+from distutils.util import strtobool
+import logging
 from pydoc import locate
 
 from matplotlib import pyplot as plt
@@ -13,7 +14,10 @@ def load_hyperparams(filepath):
     with open(filepath, newline='') as file:
         reader = csv.reader(file, delimiter=',', quotechar='|')
         for name, value, dtype in reader:
-            params[name] = locate(dtype)(value)
+            if dtype == 'bool':
+                params[name] = bool(strtobool(value))
+            else:
+                params[name] = locate(dtype)(value)
     return params
 
 
@@ -22,12 +26,13 @@ def save_hyperparams(filepath, params):
         writer = csv.writer(file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         for name, value in sorted(params.items()):
             type_str = defaultdict(lambda: None, {
+                bool: 'bool',
                 int: 'int',
                 str: 'str',
                 float: 'float',
             })[type(value)] # yapf: disable
             if type_str is not None:
-                writer.writerow(name, value, type_str)
+                writer.writerow((name, value, type_str))
 
 
 def remove_prefix(text, prefix):
