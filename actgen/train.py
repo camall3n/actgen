@@ -1,11 +1,12 @@
 import argparse
 import copy
-import logging
-import random
 import csv
+import logging
+import os
+import random
 
-import numpy as np
 import gym
+import numpy as np
 import seeding
 import torch
 from tqdm import tqdm
@@ -110,9 +111,10 @@ class Trial:
         self.file_name = self.params['agent'] + '_' \
                     + 'seed' + str(self.params['seed']) + '_' \
                     + regularizer
-        self.dir = self.params['results_dir'] + self.params['tag'] + '/'
+        self.experiment_dir = self.params['results_dir'] + self.params['tag'] + '/'
+        os.makedirs(self.experiment_dir, exist_ok=True)
 
-        utils.save_hyperparams(self.dir+self.file_name+'_hyperparams.csv', self.params)
+        utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
 
         self.gscores = []
 
@@ -145,7 +147,7 @@ class Trial:
         else:
             is_best = False
         # saving the model file
-        self.agent.save(self.file_name, self.dir, is_best)
+        self.agent.save(self.file_name, self.experiment_dir, is_best)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
@@ -190,7 +192,7 @@ class Trial:
         self.gscores.append((step, plus_g, minus_g))
 
     def save_gscores(self):
-        with open(self.dir + self.file_name + "_training_gscore.csv", 'w') as f:
+        with open(self.experiment_dir + self.file_name + "_training_gscore.csv", 'w') as f:
             csv_writer = csv.writer(f)
             for g in self.gscores:
                 csv_writer.writerow([g[0], g[1], g[2]])

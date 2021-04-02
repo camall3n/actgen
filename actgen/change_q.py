@@ -1,14 +1,15 @@
 import argparse
-import logging
-import random
 import csv
+import logging
+import os
+import random
 
-from matplotlib import pyplot as plt
-from tqdm import tqdm
-import numpy as np
 import gym
+from matplotlib import pyplot as plt
+import numpy as np
 import seeding
 import torch
+from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
@@ -90,6 +91,9 @@ class ManipulationTrial:
             print("loading model from ", self.params['load'])
             self.agent.q.load(self.params['load'])
 
+        self.experiment_dir = self.params['results_dir'] + self.params['tag'] + '/'
+        os.makedirs(self.experiment_dir, exist_ok=True)
+
     def teardown(self):
         pass
 
@@ -132,7 +136,7 @@ class ManipulationTrial:
         q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
         assert q_deltas_avg.shape == (len(actions), num_total_actions)
 
-        with open(self.params['results_dir'] + self.params['tag'] + self.params['out_file'], 'w') as f:
+        with open(self.params['dir'] + self.params['out_file'], 'w') as f:
             csv_writer = csv.writer(f)
             csv_writer.writerow(['number of similar actions that are updated in the same direction',
                                  'number of similar actions that are updated in the different direction',
