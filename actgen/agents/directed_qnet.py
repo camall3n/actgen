@@ -73,8 +73,8 @@ class DirectedQNet(MLP):
                             q_target[a][0] = float(q_target[a][0]) + delta_update
                         else:
                             one_hot_a = one_hot(torch.as_tensor([a]), depth=len(actions)).float().squeeze()  # (n_actions)
-                            original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1))[0]  # (1)
-                            get_current_q_vals = lambda s: self.forward(torch.cat([s.float(), one_hot_a], dim=-1))[0]  # (1)
+                            original_q_values = self.forward(torch.cat([s.float(), one_hot_a], dim=-1)).squeeze(dim=-1)  # (1)
+                            get_current_q_vals = lambda s: self.forward(torch.cat([s.float(), one_hot_a], dim=-1)).squeeze(dim=-1)  # (1)
                             q_target = original_q_values.clone()  # (1)
                             q_target[0] = float(original_q_values[0]) + delta_update
 
