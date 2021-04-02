@@ -1,18 +1,19 @@
 import argparse
 import copy
-import logging
-import random
 import csv
+import logging
+import os
+import random
 
-import numpy as np
 import gym
+import numpy as np
 import seeding
 import torch
 from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import RandomAgent, DQNAgent, DirectedQNet
+from .agents import RandomAgent, DQNAgent, DirectedQNet, ActionDQNAgent
 from .utils import Experience
 from .gscore import calc_g_score, build_confusion_matrix
 
@@ -36,27 +37,28 @@ class Trial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
+        parser.add_argument('--env_name', type=str, default='CartPole-v0',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random'],
+                            choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
+        parser.add_argument('--regularization', type=str, default='None',
+                            choices=['None', 'l1', 'l2', 'dropout'],
+                            help='what regularization method to use during training')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=1,
-                            help='when calculating gscore: Number of times to update a particular action q value')
-        parser.add_argument('--delta_update', '-u', type=float, default=10.0,
-                            help='when calculating gscore: increase the q value by this much for every update applied')
         parser.add_argument('--gscore', default=False, action='store_true',
                             help='Calculate the g-score vs time as training proceeds')
-        parser.add_argument('--optimizer', type=str, default='sgd',
-                            help='Which optimizer to use when manipulating q values')
+        parser.add_argument('--results_dir', type=str, default='./results/',
+                            help='Path to the result directory to save model files')
+        parser.add_argument('--tag', type=str, default='default_exp',
+                            help='A tag for the current experiment, used as a subdirectory name for saving models')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -94,7 +96,25 @@ class Trial:
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
             self.agent = DQNAgent(env.observation_space, env.action_space, self.params)
+        elif self.params['agent'] == 'action_dqn':
+            self.agent = ActionDQNAgent(env.observation_space, env.action_space, self.params)
         self.best_score = -np.inf
+
+        if self.params['regularization'] == 'l1':
+            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l1'])
+        elif self.params['regularization'] == 'l2':
+            regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l2'])
+        elif self.params['regularization'] == 'dropout':
+            regularizer = self.params['regularization'] + "_" + str(self.params['dropout_rate'])
+        else:
+            regularizer = 'none'
+        self.file_name = self.params['agent'] + '_' \
+                    + 'seed' + str(self.params['seed']) + '_' \
+                    + regularizer
+        self.experiment_dir = self.params['results_dir'] + self.params['tag'] + '/'
+        os.makedirs(self.experiment_dir, exist_ok=True)
+
+        utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
 
         self.gscores = []
 
@@ -114,7 +134,7 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s)
+                a = self.agent.act(s, testing=True)
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
@@ -126,16 +146,25 @@ class Trial:
             is_best = True
         else:
             is_best = False
-        self.agent.save(is_best, self.params['seed'])
+        # saving the model file
+        self.agent.save(self.file_name, self.experiment_dir, is_best)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
-        q_net = DirectedQNet(n_features=self.env.observation_space.shape[0],
-                             n_actions=self.env.action_space.n,
+        if self.params['agent'] == 'dqn':
+            n_inputs = self.env.observation_space.shape[0]
+            n_outputs = self.env.action_space.n
+        if self.params['agent'] == 'action_dqn':
+            n_inputs = self.env.observation_space.shape[0] + self.env.action_space.n
+            n_outputs = 1
+        q_net = DirectedQNet(n_inputs=n_inputs,
+                             n_outputs=n_outputs,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
-                             optim=self.params['optimizer'])
+                             agent_type=self.params['agent'],
+                             optim=self.params['gscore_optimizer'],
+                             pin_other_q_values=self.params['pin_other_q_values'])
 
         # perform directed q-update for each action, across multiple states
         actions = list(range(self.test_env.action_space.n))
@@ -163,7 +192,7 @@ class Trial:
         self.gscores.append((step, plus_g, minus_g))
 
     def save_gscores(self):
-        with open("results/training_gscore.csv", 'w') as f:
+        with open(self.experiment_dir + self.file_name + "_training_gscore.csv", 'w') as f:
             csv_writer = csv.writer(f)
             for g in self.gscores:
                 csv_writer.writerow([g[0], g[1], g[2]])
@@ -184,7 +213,7 @@ class Trial:
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
-        self.save_gscores()
+                self.save_gscores()
         self.teardown()
 
 

@@ -1,5 +1,7 @@
 import gym
 
+import math
+
 
 class DuplicateActions(gym.Wrapper):
     """
@@ -10,9 +12,10 @@ class DuplicateActions(gym.Wrapper):
         :param env: an unwrapped gym environment that has discrete actions
         :param n_dup: the number of times to duplicate the original actions
                         e.g. n_dup = 3 in a cartpole environment will result in a total of 6 actions
-                            in the order of (L1, R1, L2, R2, L3, R3)
+                            in the order of (L1, L2, L3, R1, R2, R3)
         """
         super(DuplicateActions, self).__init__(env)
+        self.n_dup = n_dup
         self.action_space = gym.spaces.Discrete(n_dup * env.action_space.n)
 
     def step(self, action):
@@ -22,7 +25,8 @@ class DuplicateActions(gym.Wrapper):
         """
         if action not in self.action_space:
             raise RuntimeError("trying to take action not in action space")
-        original_a = action % self.env.action_space.n  # the corresponding original action of the original env
+        # the corresponding original action of the original env
+        original_a = math.floor(action / self.n_dup)
         return self.env.step(original_a)
 
 

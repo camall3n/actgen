@@ -14,3 +14,11 @@ n_units_per_layer,256,int
 target_copy_tau,0.01,float
 replay_warmup_steps,500,int
 replay_buffer_size,50000,int
+regularization_weight_l1,0.5,float
+regularization_weight_l2,0.01,float
+dropout_rate,0,float
+num_update,1,int
+delta_update,10.0,float
+change_percentage_thresh,0.10,float
+gscore_optimizer,sgd,str
+pin_other_q_values,True,bool

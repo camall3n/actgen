@@ -24,9 +24,16 @@ class PendulumExpert:
     @classmethod
     def act(cls, state):
         annotated_state = cls.convert_state(state)
-        energy_difference = state['energy'] - 9.81*2*2
-        if np.abs(energy_difference) > 0.01:
-            a = (-np.sign(energy_difference) * np.sign(state['theta_dot']))
+        energy_difference = annotated_state['energy'] - 9.81*2*2
+        if np.abs(energy_difference) > 0.1:
+            a = (-np.sign(energy_difference) * np.sign(annotated_state['theta_dot']))
         else:
-            a = -np.sign(state['x'])
+            a = -np.sign(annotated_state['x'])
+        # remap action from {-1.0, 0.0, 1.0} -> {0, 1, 2}
+        if a > 0:
+            a = 2
+        elif a < 0:
+            a = 0
+        else:
+            a = 1
         return a

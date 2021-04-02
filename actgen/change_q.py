@@ -1,18 +1,19 @@
 import argparse
-import logging
-import random
 import csv
+import logging
+import os
+import random
 
-from matplotlib import pyplot as plt
-from tqdm import tqdm
-import numpy as np
 import gym
+from matplotlib import pyplot as plt
+import numpy as np
 import seeding
 import torch
+from tqdm import tqdm
 
 from . import utils
 from . import wrappers as wrap
-from .agents import DQNAgent, DirectedQNet
+from .agents import DQNAgent, DirectedQNet, ActionDQNAgent
 from .gscore import plot_confusion_matrix, calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,7 @@ class ManipulationTrial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
+        self.params['regularization'] = 'None'
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
@@ -29,31 +31,27 @@ class ManipulationTrial:
     def parse_args(self):
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
-        parser.add_argument('--env_name', type=str, default='LunarLander-v2',
+        parser.add_argument('--env_name', type=str, default='CartPole-v0',
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random'],
+                            choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
-        parser.add_argument('--load', type=str, default='results/qnet_seed0_best.pytorch',
-                            help='Path to a saved model that"s fully trained')
-        parser.add_argument('--out_file', type=str, default='results/change_q_metric.csv',
-                            help='Path to a output file to write to that will contain the computed metrics')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--num_update', '-n', type=int, default=1,
-                            help='Number of times to update a particular action q value')
-        parser.add_argument('--delta_update', '-u', type=float, default=10.0,
-                            help='increase the q value by this much for every update applied')
-        parser.add_argument('--change_percentage_thresh', '-p', type=float, default=0.10,
-                            help='only changes past this percentage are considered when computing the metrics')
-        parser.add_argument('--optimizer', type=str, default='sgd',
-                            help='Which optimizer to use when manipulating q values')
+        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
+                            help='Path to a saved model that"s fully trained')
+        parser.add_argument('--out_file', type=str, default='change_q_metric.csv',
+                            help='Path to a output file to write to that will contain the computed metrics')
+        parser.add_argument('--results_dir', type=str, default='./results/',
+                            help='Path to the result directory to save model files')
+        parser.add_argument('--tag', type=str, default='default_exp',
+                            help='A tag for the current experiment, used as a subdirectory name for saving models')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -84,12 +82,17 @@ class ManipulationTrial:
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
 
-        assert self.params['agent'] == 'dqn'
-        self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        if self.params['agent'] == 'dqn':
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+        elif self.params['agent'] == 'action_dqn':
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
         # load saved model
         if not self.params['test']:
             print("loading model from ", self.params['load'])
             self.agent.q.load(self.params['load'])
+
+        self.experiment_dir = self.params['results_dir'] + self.params['tag'] + '/'
+        os.makedirs(self.experiment_dir, exist_ok=True)
 
     def teardown(self):
         pass
@@ -113,19 +116,27 @@ class ManipulationTrial:
             states.append(s)
 
         # perform directed update for all states and actions
-        q_net = DirectedQNet(n_features=self.test_env.observation_space.shape[0],
-                             n_actions=self.test_env.action_space.n,
+        if self.params['agent'] == 'dqn':
+            n_inputs = self.test_env.observation_space.shape[0]
+            n_outputs = self.test_env.action_space.n
+        if self.params['agent'] == 'action_dqn':
+            n_inputs = self.test_env.observation_space.shape[0] + self.test_env.action_space.n
+            n_outputs = 1
+        q_net = DirectedQNet(n_inputs=n_inputs,
+                             n_outputs=n_outputs,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
                              lr=self.params['learning_rate'],
-                             optim=self.params['optimizer'])
+                             agent_type=self.params['agent'],
+                             optim=self.params['gscore_optimizer'],
+                             pin_other_q_values=self.params['pin_other_q_values'])
         q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
 
         # write to csv of direction of change (both for an average state)
         q_deltas_avg = np.mean(q_deltas, axis=0)  # average q_deltas over state
         assert q_deltas_avg.shape == (len(actions), num_total_actions)
 
-        with open(self.params['out_file'], 'w') as f:
+        with open(self.experiment_dir + self.params['out_file'], 'w') as f:
             csv_writer = csv.writer(f)
             csv_writer.writerow(['number of similar actions that are updated in the same direction',
                                  'number of similar actions that are updated in the different direction',
@@ -156,7 +167,7 @@ class ManipulationTrial:
         avg_cfn_mat = np.mean(cfn_mat_all_states, axis=0)
         plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
         if not self.params['test']:
-            print(f"+g score: {plus_g} \n -g score: {minus_g}")
+            print(f"+g score: {plus_g} \n-g score: {minus_g}")
             plot_confusion_matrix(avg_cfn_mat, self.params['duplicate'], len(states))
 
 

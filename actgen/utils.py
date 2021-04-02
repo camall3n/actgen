@@ -1,6 +1,7 @@
-import logging
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import csv
+from distutils.util import strtobool
+import logging
 from pydoc import locate
 
 from matplotlib import pyplot as plt
@@ -13,7 +14,10 @@ def load_hyperparams(filepath):
     with open(filepath, newline='') as file:
         reader = csv.reader(file, delimiter=',', quotechar='|')
         for name, value, dtype in reader:
-            params[name] = locate(dtype)(value)
+            if dtype == 'bool':
+                params[name] = bool(strtobool(value))
+            else:
+                params[name] = locate(dtype)(value)
     return params
 
 
@@ -22,12 +26,13 @@ def save_hyperparams(filepath, params):
         writer = csv.writer(file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         for name, value in sorted(params.items()):
             type_str = defaultdict(lambda: None, {
+                bool: 'bool',
                 int: 'int',
                 str: 'str',
                 float: 'float',
             })[type(value)] # yapf: disable
             if type_str is not None:
-                writer.writerow(name, value, type_str)
+                writer.writerow((name, value, type_str))
 
 
 def remove_prefix(text, prefix):
@@ -42,7 +47,10 @@ def update_param(params, name, value):
             "Parameter '{}' specified, but not found in hyperparams file.".format(name))
     else:
         logging.info("Updating parameter '{}' to {}".format(name, value))
-    params[name] = type(params[name])(value)
+    if type(params[name]) == bool:
+        params[name] = bool(strtobool(value))
+    else:
+        params[name] = type(params[name])(value)
 
 
 def every_n_times(n, count, callback, *args, final_count=None):
@@ -50,7 +58,7 @@ def every_n_times(n, count, callback, *args, final_count=None):
         callback(*args)
 
 
-def plot_training_gscore(fname='results/training_gscore_sgd.csv'):
+def plot_training_gscore(fname='results/training_gscore.csv'):
     """
     plot the +/- g score over time as training proceeds
     """
@@ -60,10 +68,14 @@ def plot_training_gscore(fname='results/training_gscore_sgd.csv'):
         time = [int(i[0]) for i in g_scores]
         plus_g = [float(i[1]) for i in g_scores]
         minus_g = [float(i[2]) for i in g_scores]
+        ratio = [plus_g[i] / minus_g[i] for i in range(len(plus_g))]
+        diff = [plus_g[i] - minus_g[i] for i in range(len(plus_g))]
 
         plt.figure()
         plt.plot(time, plus_g, label='+g')
         plt.plot(time, minus_g, label='-g')
+        # plt.plot(time, ratio, 'g', label='ratio')
+        plt.plot(time, diff, 'r', label='difference')
         plt.title('g score over time during training with SGD')
         plt.xlabel('training step')
         plt.ylabel('g score')

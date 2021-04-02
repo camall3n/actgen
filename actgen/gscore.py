@@ -17,19 +17,12 @@ def build_confusion_matrix(q_deltas, num_duplicate):
     """
     # arrange index so similar actions are adjacent
     num_actions = len(q_deltas)
-    num_original_actions = int(num_actions / num_duplicate)
-    new_idx = []
-    for i in range(num_original_actions):
-        new_idx += list(range(i, num_actions, num_original_actions))
-    assert len(new_idx) == num_actions
-    q_deltas = q_deltas[new_idx]
 
     mat = np.zeros((num_actions, num_actions))
     for action, q_delta in enumerate(q_deltas):
         # normalize q_delta by min-max scaling to [0, 1]
         q_delta = (q_delta - np.min(q_delta)) / (np.max(q_delta) - np.min(q_delta))
         # put row in matrix
-        q_delta = q_delta[new_idx]
         mat[action] = q_delta
     return mat
 
@@ -46,8 +39,8 @@ def calc_g_score(avg_confusion_mat, num_duplicate):
     num_actions = len(avg_confusion_mat)
     num_original_actions = int(num_actions / num_duplicate)
     # matrix diagonal should be all 1's
-    for i in range(num_actions):
-        assert avg_confusion_mat[i, i] == 1
+    # for i in range(num_actions):
+        # assert avg_confusion_mat[i, i] == 1
 
     # get plus_g score
     plus_g_sum = 0
