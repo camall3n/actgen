@@ -79,16 +79,23 @@ class DQNAgent():
     def _get_q_targets(self, batch):
         with torch.no_grad():
             # Compute Double-Q targets
-            next_state = torch.stack(batch.next_state).float()
-            ap = torch.argmax(self.q(next_state), dim=-1)
-            vp = self.q_target(next_state).gather(-1, ap.unsqueeze(-1)).squeeze(-1)
-            not_done_idx = ~torch.stack(batch.done)
-            targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx
+            next_state = torch.stack(batch.next_state).float()  # (batch_size, dim_state)
+            ap = torch.argmax(self.q(next_state), dim=-1)  # (batch_size, )
+            vp = self.q_target(next_state).gather(-1, ap.unsqueeze(-1)).squeeze(-1)  # (batch_size, )
+            not_done_idx = ~torch.stack(batch.done)  # (batch_size, )
+            targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx  # (batch_size, )
+            if self.params['dqn_train_pin_other_q_values']:
+                all_action_targets = self._get_q_predictions(batch)  # (batch_size, n_actions)
+                for i, target in enumerate(targets):
+                    all_action_targets[i, batch.action[i]] = target
+                return all_action_targets
         return targets
 
     def _get_q_predictions(self, batch):
-        q_values = self.q(torch.stack(batch.state).float())
-        q_acted = extract(q_values, idx=torch.stack(batch.action).long(), idx_dim=-1)
+        q_values = self.q(torch.stack(batch.state).float())  # (batch_size, n_actions)
+        if self.params['dqn_train_pin_other_q_values']:
+            return q_values
+        q_acted = extract(q_values, idx=torch.stack(batch.action).long(), idx_dim=-1)  #(batch_size,)
         return q_acted
 
     def _get_q_values_for_state(self, x):
