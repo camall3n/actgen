@@ -194,6 +194,7 @@ class Trial:
 
         # store the g-score at this time step
         self.gscores.append((step, plus_g, minus_g))
+        self.save_gscores()
 
     def save_gscores(self):
         with open(self.experiment_dir + self.file_name + "_training_gscore.csv", 'w') as f:
@@ -223,7 +224,6 @@ class Trial:
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
-                self.save_gscores()
         self.teardown()
 
 
