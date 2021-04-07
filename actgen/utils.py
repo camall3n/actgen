@@ -56,32 +56,3 @@ def update_param(params, name, value):
 def every_n_times(n, count, callback, *args, final_count=None):
     if (count % n == 0) or (final_count is not None and (count == final_count)):
         callback(*args)
-
-
-def plot_training_gscore(fname='results/training_gscore.csv'):
-    """
-    plot the +/- g score over time as training proceeds
-    """
-    with open(fname, 'r') as f:
-        reader = csv.reader(f)
-        g_scores = list(reader)
-        time = [int(i[0]) for i in g_scores]
-        plus_g = [float(i[1]) for i in g_scores]
-        minus_g = [float(i[2]) for i in g_scores]
-        ratio = [plus_g[i] / minus_g[i] for i in range(len(plus_g))]
-        diff = [plus_g[i] - minus_g[i] for i in range(len(plus_g))]
-
-        plt.figure()
-        plt.plot(time, plus_g, label='+g')
-        plt.plot(time, minus_g, label='-g')
-        # plt.plot(time, ratio, 'g', label='ratio')
-        plt.plot(time, diff, 'r', label='difference')
-        plt.title('g score over time during training with SGD')
-        plt.xlabel('training step')
-        plt.ylabel('g score')
-        plt.legend()
-        plt.show()
-
-
-if __name__ == '__main__':
-    plot_training_gscore()
