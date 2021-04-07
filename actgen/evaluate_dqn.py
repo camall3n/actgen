@@ -45,8 +45,6 @@ class EvalTrial:
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
-                            help='Path to the saved model file')
         parser.add_argument('--results_dir', type=str, default='./results/',
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
