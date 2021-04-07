@@ -117,6 +117,7 @@ class Trial:
         utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
 
         self.gscores = []
+        self.evaluation_rewards = []
 
     def teardown(self):
         pass
@@ -141,6 +142,7 @@ class Trial:
         avg_episode_score = (sum(ep_scores) / len(ep_scores)).item()
         logging.info("Evaluation: step {}, average score {}".format(
             step, avg_episode_score))
+        self.evaluation_rewards.append((step, avg_episode_score))
         if avg_episode_score > self.best_score:
             self.best_score = avg_episode_score
             is_best = True
@@ -148,6 +150,8 @@ class Trial:
             is_best = False
         # saving the model file
         self.agent.save(self.file_name, self.experiment_dir, is_best)
+        # save the rewards
+        self.save_rewards()
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
@@ -196,6 +200,12 @@ class Trial:
             csv_writer = csv.writer(f)
             for g in self.gscores:
                 csv_writer.writerow([g[0], g[1], g[2]])
+    
+    def save_rewards(self):
+        with open(self.experiment_dir + self.file_name + "_training_reward.csv", 'w') as f:
+            csv_writer = csv.writer(f)
+            for r in self.evaluation_rewards:
+                csv_writer.writerow([r[0], r[1]])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
