@@ -3,7 +3,7 @@ import math
 import numpy as np
 import torch
 
-from ..nnutils import extract, MLP
+from ..nnutils import extract, MLP, one_hot
 from .replaymemory import ReplayMemory
 
 
@@ -77,6 +77,23 @@ class DQNAgent():
             alpha = np.clip(alpha, 0, 1)
             epsilon = self.params['epsilon_final'] * alpha + 1 * (1 - alpha)
         return epsilon
+    
+    def _get_action_similarities(self, batch):
+        """
+        return tensor of size (batch_size, n_actions) with values between 0 and 1.
+        1 if "fully similar"; 0 if "fully different".
+        """
+        action_taken = torch.tensor(batch.action)
+        similarity_mat = one_hot(action_taken, self.action_space.n)  # (batch_size, n_actions)
+        if self.params['oracle']:
+            # all duplicate actions are fully similar
+            # for each action taken in the batch
+            for i, acted in enumerate(action_taken):
+                num_dup = self.params['duplicate']
+                original_env_a = math.floor(acted / num_dup)
+                all_duplicate_actions = list(range(original_env_a * num_dup, original_env_a * num_dup + num_dup))
+                similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
+        return similarity_mat
 
     def _get_q_targets(self, batch):
         with torch.no_grad():
@@ -85,23 +102,14 @@ class DQNAgent():
             ap = torch.argmax(self.q(next_state), dim=-1)  # (batch_size, )
             vp = self.q_target(next_state).gather(-1, ap.unsqueeze(-1)).squeeze(-1)  # (batch_size, )
             not_done_idx = ~torch.stack(batch.done)  # (batch_size, )
-            targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx  # (batch_size, )
+            q_targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx  # (batch_size, )
             if self.params['dqn_train_pin_other_q_values']:
-                all_action_targets = self._get_q_predictions(batch)  # (batch_size, n_actions)
-                # for sample in batch
-                for i, target in enumerate(targets):
-                    action_taken = batch.action[i]
-                    if self.params['oracle']:
-                        # oracle update
-                        num_dup = self.params['duplicate']
-                        original_a = math.floor(action_taken / num_dup)
-                        similar_a = list(range(original_a * num_dup, original_a * num_dup + num_dup))
-                        all_action_targets[i, similar_a] = target
-                    else:
-                        # normal update
-                        all_action_targets[i, action_taken] = target
-                return all_action_targets
-        return targets
+                q_predictions = self._get_q_predictions(batch)  # (batch_size, n_actions)
+                action_similarities = self._get_action_similarities(batch)  # (batch_size, n_actions)
+                td_error = q_targets.unsqueeze(-1) - q_predictions  # (batch_size, n_actions)
+                all_action_q_targets = q_predictions + action_similarities * td_error  # (batch_size, n_actions)
+                return all_action_q_targets  # (batch_size, n_actions)
+        return q_targets
 
     def _get_q_predictions(self, batch):
         q_values = self.q(torch.stack(batch.state).float())  # (batch_size, n_actions)
