@@ -1,5 +1,6 @@
 import os
 import csv
+import math
 import argparse
 
 from matplotlib import pyplot as plt
@@ -102,7 +103,7 @@ def plot_training_g_score(directory, tag):
     # average the g_difference and get 95% confidence interval
     # each row of g_difference contains an example
     avg_g_difference = np.mean(g_difference, axis=0)
-    ci = 1.96 * np.std(g_difference, axis=0)
+    ci = 1.96 * np.std(g_difference, axis=0) / math.sqrt(len(g_difference))
 
     # plot
     plt.figure()
