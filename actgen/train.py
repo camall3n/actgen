@@ -38,6 +38,7 @@ class Trial:
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
         parser.add_argument('--env_name', type=str, default='CartPole-v0',
+                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2'],
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
