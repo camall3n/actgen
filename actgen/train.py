@@ -57,7 +57,7 @@ class Trial:
         parser.add_argument('--gscore', default=False, action='store_true',
                             help='Calculate the g-score vs time as training proceeds')
         parser.add_argument('--oracle', default=False, action='store_true',
-                            help='use our expert domain knowledge to perform oracle update')
+                            help='to perform oracle action generalization')
         parser.add_argument('--results_dir', type=str, default='./results/',
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
@@ -95,8 +95,8 @@ class Trial:
         self.env = env
         self.test_env = test_env
 
-        if self.params['oracle']:
-	        self.params['dqn_train_pin_other_q_values'] = True
+        if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
+            raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
 
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
