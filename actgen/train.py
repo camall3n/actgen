@@ -55,6 +55,8 @@ class Trial:
                             help='Enable test mode for quickly checking configuration works')
         parser.add_argument('--gscore', default=False, action='store_true',
                             help='Calculate the g-score vs time as training proceeds')
+        parser.add_argument('--oracle', default=False, action='store_true',
+                            help='use our expert domain knowledge to perform oracle update')
         parser.add_argument('--results_dir', type=str, default='./results/',
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
@@ -91,6 +93,9 @@ class Trial:
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
         self.test_env = test_env
+
+        if self.params['oracle']:
+	        self.params['dqn_train_pin_other_q_values'] = True
 
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)

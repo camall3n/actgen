@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import torch
 
@@ -86,8 +88,18 @@ class DQNAgent():
             targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx  # (batch_size, )
             if self.params['dqn_train_pin_other_q_values']:
                 all_action_targets = self._get_q_predictions(batch)  # (batch_size, n_actions)
+                # for sample in batch
                 for i, target in enumerate(targets):
-                    all_action_targets[i, batch.action[i]] = target
+                    action_taken = batch.action[i]
+                    if self.params['oracle']:
+                        # oracle update
+                        num_dup = self.params['duplicate']
+                        original_a = math.floor(action_taken / num_dup)
+                        similar_a = list(range(original_a * num_dup, original_a * num_dup + num_dup))
+                        all_action_targets[i, similar_a] = target
+                    else:
+                        # normal update
+                        all_action_targets[i, action_taken] = target
                 return all_action_targets
         return targets
 
