@@ -122,8 +122,6 @@ class Trial:
 
         utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
 
-        self.gscores = []
-
     def teardown(self):
         pass
 
@@ -154,6 +152,8 @@ class Trial:
             is_best = False
         # saving the model file
         self.agent.save(self.file_name, self.experiment_dir, is_best)
+        # save the rewards
+        self.save_rewards(step, avg_episode_score)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
@@ -195,13 +195,23 @@ class Trial:
         plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
 
         # store the g-score at this time step
-        self.gscores.append((step, plus_g, minus_g))
+        self.save_gscores(step, plus_g, minus_g)
 
-    def save_gscores(self):
-        with open(self.experiment_dir + self.file_name + "_training_gscore.csv", 'w') as f:
+    def save_gscores(self, step, plus_g, minus_g):
+        mode = 'w' if step == 0 else 'a'
+        with open(self.experiment_dir + self.file_name + "_training_gscore.csv", mode) as f:
             csv_writer = csv.writer(f)
-            for g in self.gscores:
-                csv_writer.writerow([g[0], g[1], g[2]])
+            if step == 0:  # write header
+                csv_writer.writerow(['training step', 'plus_g', 'minus_g'])
+            csv_writer.writerow([step, plus_g, minus_g])
+    
+    def save_rewards(self, step, r):
+        mode = 'w' if step == 0 else 'a'
+        with open(self.experiment_dir + self.file_name + "_training_reward.csv", mode) as f:
+            csv_writer = csv.writer(f)
+            if step == 0:  # write header
+                csv_writer.writerow(['training step', 'reward during evaluation callback'])
+            csv_writer.writerow([step, r])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
@@ -219,7 +229,6 @@ class Trial:
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
-                self.save_gscores()
         self.teardown()
 
 
