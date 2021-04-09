@@ -116,9 +116,6 @@ class Trial:
 
         utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
 
-        self.gscores = []
-        self.evaluation_rewards = []
-
     def teardown(self):
         pass
 
@@ -142,7 +139,6 @@ class Trial:
         avg_episode_score = (sum(ep_scores) / len(ep_scores)).item()
         logging.info("Evaluation: step {}, average score {}".format(
             step, avg_episode_score))
-        self.evaluation_rewards.append((step, avg_episode_score))
         if avg_episode_score > self.best_score:
             self.best_score = avg_episode_score
             is_best = True
@@ -151,7 +147,7 @@ class Trial:
         # saving the model file
         self.agent.save(self.file_name, self.experiment_dir, is_best)
         # save the rewards
-        self.save_rewards()
+        self.save_rewards(step, avg_episode_score)
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
@@ -193,20 +189,19 @@ class Trial:
         plus_g, minus_g = calc_g_score(avg_cfn_mat, self.params['duplicate'])
 
         # store the g-score at this time step
-        self.gscores.append((step, plus_g, minus_g))
-        self.save_gscores()
+        self.save_gscores(step, plus_g, minus_g)
 
-    def save_gscores(self):
-        with open(self.experiment_dir + self.file_name + "_training_gscore.csv", 'w') as f:
+    def save_gscores(self, step, plus_g, minus_g):
+        mode = 'w' if step == 0 else 'a'
+        with open(self.experiment_dir + self.file_name + "_training_gscore.csv", mode) as f:
             csv_writer = csv.writer(f)
-            for g in self.gscores:
-                csv_writer.writerow([g[0], g[1], g[2]])
+            csv_writer.writerow([step, plus_g, minus_g])
     
-    def save_rewards(self):
-        with open(self.experiment_dir + self.file_name + "_training_reward.csv", 'w') as f:
+    def save_rewards(self, step, r):
+        mode = 'w' if step == 0 else 'a'
+        with open(self.experiment_dir + self.file_name + "_training_reward.csv", mode) as f:
             csv_writer = csv.writer(f)
-            for r in self.evaluation_rewards:
-                csv_writer.writerow([r[0], r[1]])
+            csv_writer.writerow([step, r])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
