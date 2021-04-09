@@ -1,6 +1,8 @@
 import argparse
 import logging
 import random
+import os
+import csv
 
 import numpy as np
 import gym
@@ -14,7 +16,7 @@ from .agents import DQNAgent, ActionDQNAgent
 logging.basicConfig(level=logging.INFO)
 
 
-class Trial:
+class EvalTrial:
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
@@ -39,12 +41,14 @@ class Trial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/lunar_lander.csv',
+        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
                             help='Path to hyperparameters csv file')
         parser.add_argument('--test', default=False, action='store_true',
                             help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
-                            help='Path to the saved model file')
+        parser.add_argument('--results_dir', type=str, default='./results/',
+                            help='Path to the result directory to save model files')
+        parser.add_argument('--tag', type=str, default='default_exp',
+                            help='A tag for the current experiment, used as a subdirectory name for saving models')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -79,30 +83,51 @@ class Trial:
             self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
         elif self.params['agent'] == 'action_dqn':
             self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
-        # load saved model
-        if not self.params['test']:
-            self.agent.q.load(self.params['load'])
+        
+        self.all_rewards = []
 
     def teardown(self):
         pass
 
-    def evaluate(self, step):
-        ep_scores = []
-        for ep in range(self.params['n_eval_episodes']):
-            s, G, done, t = self.test_env.reset(), 0, False, 0
-            while not done:
-                a = self.agent.act(s, testing=True)
-                sp, r, done, _ = self.test_env.step(a)
-                s, G, t = sp, G + r, t + 1
-            ep_scores.append(G.detach())
-        avg_episode_score = (sum(ep_scores)/len(ep_scores)).item()
-        logging.info("Evaluation: step {}, average score {}".format(
-            step, avg_episode_score))
+    def evaluate(self):
+        # iterate over the directory
+        directory = self.params['results_dir'] + self.params['tag']
+        for file_name in os.listdir(directory):
+            # find best models
+            if file_name.endswith("best.pytorch"):
+                file_path = os.path.join(directory, file_name)
+                # load saved model
+                if not self.params['test']:
+                    self.agent.q.load(file_path)
+                # get reward for current model
+                ep_scores = []
+                for _ in range(self.params['n_eval_episodes']):
+                    s, G, done, t = self.test_env.reset(), 0, False, 0
+                    while not done:
+                        a = self.agent.act(s, testing=True)
+                        sp, r, done, _ = self.test_env.step(a)
+                        s, G, t = sp, G + r, t + 1
+                    ep_scores.append(G.detach())
+                avg_episode_score = (sum(ep_scores)/len(ep_scores)).item()
+                logging.info("Evaluation: average score {}".format(avg_episode_score))
+                self.all_rewards.append((file_path, avg_episode_score))
+    
+    def save_rewards(self):
+        reward_file_path = os.path.join(self.params['results_dir'] + self.params['tag'], "evaluation_reward.csv")
+        with open(reward_file_path, 'w') as f:
+            csv_writer = csv.writer(f)
+            avg_reward = sum([i for _, i in self.all_rewards]) / len(self.all_rewards)
+            csv_writer.writerow(['average reward', avg_reward])
+            for r in self.all_rewards:
+                csv_writer.writerow([r[0], r[1]])
+        logging.info("saved all evaluation reward to {}".format(reward_file_path))
+        logging.info("found {} saved best models".format(len(self.all_rewards)))
 
 
 def main(test=False):
-    trial = Trial(test=test)
-    trial.evaluate(0)
+    trial = EvalTrial(test=test)
+    trial.evaluate()
+    trial.save_rewards()
 
 
 if __name__ == "__main__":
