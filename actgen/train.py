@@ -38,6 +38,7 @@ class Trial:
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
         parser.add_argument('--env_name', type=str, default='CartPole-v0',
+                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2'],
                             help='Which gym environment to use')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
@@ -55,6 +56,8 @@ class Trial:
                             help='Enable test mode for quickly checking configuration works')
         parser.add_argument('--gscore', default=False, action='store_true',
                             help='Calculate the g-score vs time as training proceeds')
+        parser.add_argument('--oracle', default=False, action='store_true',
+                            help='to perform oracle action generalization')
         parser.add_argument('--results_dir', type=str, default='./results/',
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
@@ -91,6 +94,9 @@ class Trial:
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
         self.test_env = test_env
+
+        if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
+            raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
 
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
