@@ -16,6 +16,15 @@ def read_g_score_csv(fname):
 	return np.array(time_step), np.array(plus_g), np.array(minus_g)
 
 
+def read_reward_csv(fname):
+	with open(fname, 'r') as f:
+		reader = csv.reader(f)
+		rewards_over_time = list(reader)
+		time_step = [int(i[0]) for i in rewards_over_time]
+		rewards = [float(i[1]) for i in rewards_over_time]
+	return np.array(time_step), np.array(rewards)
+
+
 def plot_training_g_score(directory, tag):
 	time_step = np.array([])
 	g_difference = np.array([])
@@ -48,6 +57,38 @@ def plot_training_g_score(directory, tag):
 	plt.show()
 
 
+def plot_training_rewards(directory, tag):
+	time_step = np.array([])
+	rewards = np.array([])
+		# iterate over the directory
+	for file_name in os.listdir(directory):
+		# find all the saved gscore files
+		if file_name.endswith("training_reward.csv"):
+			file_path = os.path.join(directory, file_name)
+			step, r = read_reward_csv(file_path)
+			if len(time_step) == 0:
+				time_step = step
+			assert time_step.all() == step.all()
+			rewards = r if len(rewards) == 0 else np.vstack([rewards, r])
+	# average the g_difference and get 95% confidence interval
+	# each row of g_difference contains an example
+	if len(rewards) == 0:
+		raise RuntimeWarning("no training reward csv files found in the specified tag directory")
+	avg_rewards = np.mean(rewards, axis=0)
+	ci = 1.96 * np.std(rewards, axis=0) / math.sqrt(len(rewards))
+
+	# plot
+	plt.figure()
+	plt.plot(time_step, avg_rewards, label='average training reward')
+	plt.fill_between(time_step, avg_rewards - ci, avg_rewards + ci, alpha=.1, label="95% CI")
+	# plt.ylim((-1, 1))
+	plt.title(f'training reward over time during callback with {tag}')
+	plt.xlabel('training step')
+	plt.ylabel('average reward')
+	plt.legend()
+	plt.show()
+
+
 def parse_args():
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('--results_dir', type=str, default='./results/',
@@ -61,10 +102,13 @@ def parse_args():
 def main():
 	# parse arguments
 	args = parse_args()
+	directory = args.results_dir + args.tag
 
 	# plot g score
-	directory = args.results_dir + args.tag
 	plot_training_g_score(directory, args.tag)
+
+	# plot rewards
+	plot_training_rewards(directory, args.tag)
 
 
 if __name__ == '__main__':
