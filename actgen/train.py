@@ -195,12 +195,16 @@ class Trial:
         mode = 'w' if step == 0 else 'a'
         with open(self.experiment_dir + self.file_name + "_training_gscore.csv", mode) as f:
             csv_writer = csv.writer(f)
+            if step == 0:  # write header
+                csv_writer.writerow(['training step', 'plus_g', 'minus_g'])
             csv_writer.writerow([step, plus_g, minus_g])
     
     def save_rewards(self, step, r):
         mode = 'w' if step == 0 else 'a'
         with open(self.experiment_dir + self.file_name + "_training_reward.csv", mode) as f:
             csv_writer = csv.writer(f)
+            if step == 0:  # write header
+                csv_writer.writerow(['training step', 'reward during evaluation callback'])
             csv_writer.writerow([step, r])
 
     def run(self):
