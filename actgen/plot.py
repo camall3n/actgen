@@ -13,6 +13,7 @@ def read_csv(fname):
 	"""
 	with open(fname, 'r') as f:
 		reader = csv.reader(f)
+		next(reader, None)  # skip over the header of csv
 		reader_results = [[float(i) for i in row] for row in list(reader)]
 		columns = list(zip(*reader_results))
 	return np.array(columns)
