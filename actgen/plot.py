@@ -31,7 +31,7 @@ def plot_training_g_score(directory, tag):
 			if len(time_step) == 0:
 				time_step = step
 			assert time_step.all() == step.all()
-			g_difference = plus_g - minus_g if len(g_difference) == 0 else np.vstack([g_difference, plus_g - minus_g])
+			g_difference = np.expand_dims(plus_g - minus_g, 0) if len(g_difference) == 0 else np.vstack([g_difference, plus_g - minus_g])
 	# average the g_difference and get 95% confidence interval
 	# each row of g_difference contains an example
 	if len(g_difference) == 0:
