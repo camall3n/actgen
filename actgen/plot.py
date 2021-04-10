@@ -19,7 +19,11 @@ def read_csv(fname):
 	return np.array(columns)
 
 
-def plot_training_g_score(directory, tag):
+def prepro_g_score(directory):
+	"""
+	go through the specified directory and compute the data needed for plotting
+	return time_step, avg_g_diff, confidence_interval
+	"""
 	time_step = np.array([])
 	g_difference = np.array([])
 	# iterate over the directory
@@ -35,23 +39,17 @@ def plot_training_g_score(directory, tag):
 	# average the g_difference and get 95% confidence interval
 	# each row of g_difference contains an example
 	if len(g_difference) == 0:
-		raise RuntimeWarning("no training gscore csv files found in the specified tag directory")
+		raise RuntimeWarning("no training gscore csv files found in the specified directory")
 	avg_g_difference = np.mean(g_difference, axis=0)
 	ci = 1.96 * np.std(g_difference, axis=0) / math.sqrt(len(g_difference))
-
-	# plot
-	plt.figure()
-	plt.plot(time_step, avg_g_difference, label='average g difference')
-	plt.fill_between(time_step, avg_g_difference - ci, avg_g_difference + ci, alpha=.1, label="95% CI")
-	# plt.ylim((-1, 1))
-	plt.title(f'g difference over time during training with {tag}')
-	plt.xlabel('training step')
-	plt.ylabel('g diffence')
-	plt.legend()
-	plt.show()
+	return time_step, avg_g_difference, ci
 
 
-def plot_training_rewards(directory, tag):
+def prepro_training_rewards(directory):
+	"""
+	go through the specified directory and compute the data needed for plotting
+	return time_step, rewards, confidence_interval
+	"""
 	time_step = np.array([])
 	rewards = np.array([])
 		# iterate over the directory
@@ -70,15 +68,23 @@ def plot_training_rewards(directory, tag):
 		raise RuntimeWarning("no training reward csv files found in the specified tag directory")
 	avg_rewards = np.mean(rewards, axis=0)
 	ci = 1.96 * np.std(rewards, axis=0) / math.sqrt(len(rewards))
+	return time_step, avg_rewards, ci
 
-	# plot
+
+def plot_training_data(normal, oracle, exp_name, data_type):
+	"""
+	plot the normal DQN and oracle DQN results on the same graph
+	used to plot training g-score or reward
+	"""
 	plt.figure()
-	plt.plot(time_step, avg_rewards, label='average training reward')
-	plt.fill_between(time_step, avg_rewards - ci, avg_rewards + ci, alpha=.1, label="95% CI")
+	plt.plot(normal[0], normal[1], label='normal {}'.format(data_type))
+	plt.fill_between(normal[0], normal[1] - normal[2], normal[1] + normal[2], alpha=.1, label="normal 95% CI")
+	plt.plot(oracle[0], oracle[1], label='oracle {}'.format(data_type))
+	plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1, label="oracle 95% CI")
 	# plt.ylim((-1, 1))
-	plt.title(f'training reward over time during callback with {tag}')
+	plt.title('{} over time during training with {}'.format(data_type, exp_name))
 	plt.xlabel('training step')
-	plt.ylabel('average reward')
+	plt.ylabel('{}'.format(data_type))
 	plt.legend()
 	plt.show()
 
@@ -98,11 +104,16 @@ def main():
 	args = parse_args()
 	directory = args.results_dir + args.tag
 
-	# plot g score
-	plot_training_g_score(directory, args.tag)
+	# preprocess the csv
+	normal_exp_gscore = prepro_g_score(directory)
+	oracle_exp_gscore = prepro_g_score(directory + "-oracle")
+	
+	normal_exp_reward = prepro_training_rewards(directory)
+	oracle_exp_reward = prepro_training_rewards(directory + "-oracle")
 
-	# plot rewards
-	plot_training_rewards(directory, args.tag)
+	# plot 
+	plot_training_data(normal_exp_gscore, oracle_exp_gscore, args.tag, "g difference")
+	plot_training_data(normal_exp_reward, oracle_exp_reward, args.tag, "rewards")
 
 
 if __name__ == '__main__':
