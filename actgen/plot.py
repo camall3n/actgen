@@ -6,23 +6,16 @@ import argparse
 from matplotlib import pyplot as plt
 import numpy as np
 
-def read_g_score_csv(fname):
+
+def read_csv(fname):
+	"""
+	used to read in gscore csv & reward csv
+	"""
 	with open(fname, 'r') as f:
 		reader = csv.reader(f)
-		g_scores = list(reader)
-		time_step = [int(i[0]) for i in g_scores]
-		plus_g = [float(i[1]) for i in g_scores]
-		minus_g = [float(i[2]) for i in g_scores]
-	return np.array(time_step), np.array(plus_g), np.array(minus_g)
-
-
-def read_reward_csv(fname):
-	with open(fname, 'r') as f:
-		reader = csv.reader(f)
-		rewards_over_time = list(reader)
-		time_step = [int(i[0]) for i in rewards_over_time]
-		rewards = [float(i[1]) for i in rewards_over_time]
-	return np.array(time_step), np.array(rewards)
+		reader_results = [[float(i) for i in row] for row in list(reader)]
+		columns = list(zip(*reader_results))
+	return np.array(columns)
 
 
 def plot_training_g_score(directory, tag):
@@ -33,7 +26,7 @@ def plot_training_g_score(directory, tag):
 		# find all the saved gscore files
 		if file_name.endswith("training_gscore.csv"):
 			file_path = os.path.join(directory, file_name)
-			step, plus_g, minus_g = read_g_score_csv(file_path)
+			step, plus_g, minus_g = read_csv(file_path)
 			if len(time_step) == 0:
 				time_step = step
 			assert time_step.all() == step.all()
@@ -65,7 +58,7 @@ def plot_training_rewards(directory, tag):
 		# find all the saved gscore files
 		if file_name.endswith("training_reward.csv"):
 			file_path = os.path.join(directory, file_name)
-			step, r = read_reward_csv(file_path)
+			step, r = read_csv(file_path)
 			if len(time_step) == 0:
 				time_step = step
 			assert time_step.all() == step.all()
