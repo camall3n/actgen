@@ -2,9 +2,12 @@ import os
 import csv
 import math
 import argparse
+import logging
 
 from matplotlib import pyplot as plt
 import numpy as np
+
+logging.basicConfig(level=logging.INFO)
 
 
 def read_csv(fname):
@@ -24,6 +27,9 @@ def prepro_g_score(directory):
 	go through the specified directory and compute the data needed for plotting
 	return time_step, avg_g_diff, confidence_interval
 	"""
+	if not os.path.exists(directory):
+		logging.info("directory {} not found".format(directory))
+		return [], [], []
 	time_step = np.array([])
 	g_difference = np.array([])
 	# iterate over the directory
@@ -50,6 +56,9 @@ def prepro_training_rewards(directory):
 	go through the specified directory and compute the data needed for plotting
 	return time_step, rewards, confidence_interval
 	"""
+	if not os.path.exists(directory):
+		logging.info("directory {} not found".format(directory))
+		return [], [], []
 	time_step = np.array([])
 	rewards = np.array([])
 		# iterate over the directory
@@ -79,8 +88,10 @@ def plot_training_data(normal, oracle, exp_name, data_type):
 	plt.figure()
 	plt.plot(normal[0], normal[1], label='normal {}'.format(data_type))
 	plt.fill_between(normal[0], normal[1] - normal[2], normal[1] + normal[2], alpha=.1, label="normal 95% CI")
-	plt.plot(oracle[0], oracle[1], label='oracle {}'.format(data_type))
-	plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1, label="oracle 95% CI")
+	# draw oracle only if one was provided
+	if len(oracle[0]) != 0:
+		plt.plot(oracle[0], oracle[1], label='oracle {}'.format(data_type))
+		plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1, label="oracle 95% CI")
 	# plt.ylim((-1, 1))
 	plt.title('{} over time during training with {}'.format(data_type, exp_name))
 	plt.xlabel('training step')
