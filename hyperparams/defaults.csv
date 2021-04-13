@@ -4,7 +4,7 @@ gscore_every_n_steps,1000,int
 n_eval_episodes,10,int
 n_gscore_states,100,int
 updates_per_env_step,1,int
-learning_rate,0.0001,float
+learning_rate,0.001,float
 epsilon_final,0.05,float
 epsilon_decay_period,2500,int
 gamma,0.99,float
