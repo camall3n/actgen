@@ -71,7 +71,7 @@ class DQNAgent():
 
     def _get_epsilon(self, testing=False):
         if testing:
-            epsilon = self.params['epsilon_final']
+            epsilon = self.params['epsilon_during_eval']
         else:
             alpha = (len(self.replay) - self.params['replay_warmup_steps']) / self.params['epsilon_decay_period']
             alpha = np.clip(alpha, 0, 1)
