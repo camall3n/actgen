@@ -100,12 +100,32 @@ def plot_training_data(normal, oracle, exp_name, data_type):
 	plt.show()
 
 
+def plot_all_learning_curves(results_dir, tag, param_tuned):
+	"""
+	plot all the learning curves for different hyperparams
+	"""
+	plt.figure()
+	for subdir in os.listdir(results_dir):
+		if subdir.startswith(tag + param_tuned):
+			absolute_dir = results_dir + subdir
+			rewards = prepro_training_rewards(absolute_dir)
+			plt.plot(rewards[0], rewards[1], label=subdir)
+			plt.fill_between(rewards[0], rewards[1] - rewards[2], rewards[1] + rewards[2], alpha=.1)
+	plt.title('learninge curves for all {}'.format(tag + param_tuned))
+	plt.xlabel('training step')
+	plt.ylabel('reward')
+	plt.legend()
+	plt.show()
+
+
 def parse_args():
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('--results_dir', type=str, default='./results/',
 						help='Path to the result directory of saved results files')
 	parser.add_argument('--tag', type=str, default='default_exp',
 						help='a subdirectory name for the saved results')
+	parser.add_argument('--tune_lr', default=False, action='store_true',
+                            help='plot all training curves of different learning rate on one graph')
 	args = parser.parse_args()
 	return args
 
@@ -114,6 +134,11 @@ def main():
 	# parse arguments
 	args = parse_args()
 	directory = args.results_dir + args.tag
+
+	# learning curve to tune learning rate
+	if args.tune_lr:
+		plot_all_learning_curves(args.results_dir, args.tag, param_tuned='-lr')
+		return
 
 	# preprocess the csv
 	normal_exp_gscore = prepro_g_score(directory)
