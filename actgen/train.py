@@ -134,14 +134,6 @@ class Trial:
         return loss
 
     def evaluate(self, step):
-        # backup hyperparams before chaning them to eval mode
-        hyperparams_backup = (self.params['epsilon_final'], self.params['n_eval_episodes'], 
-                    self.params['replay_warmup_steps'], self.params['epsilon_decay_period'])
-        self.params['epsilon_final'] = 0
-        self.params['n_eval_episodes'] = 100
-        self.params['replay_warmup_steps'] = 0
-        self.params['epsilon_decay_period'] = 0
-        # eval
         ep_scores = []
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
@@ -162,9 +154,6 @@ class Trial:
         self.agent.save(self.file_name, self.experiment_dir, is_best)
         # save the rewards
         self.save_rewards(step, avg_episode_score)
-        # restore hyperparams after eval mode
-        (self.params['epsilon_final'], self.params['n_eval_episodes'], 
-                    self.params['replay_warmup_steps'], self.params['epsilon_decay_period']) = hyperparams_backup
 
     def gscore_callback(self, step):
         # make a net qnet to test manipulated q updates on
