@@ -22,7 +22,7 @@ def read_csv(fname):
 	return np.array(columns)
 
 
-def prepro_g_score(directory):
+def preprocess_g_score(directory):
 	"""
 	go through the specified directory and compute the data needed for plotting
 	return time_step, avg_g_diff, confidence_interval
@@ -51,7 +51,7 @@ def prepro_g_score(directory):
 	return time_step, avg_g_difference, ci
 
 
-def prepro_training_rewards(directory):
+def preprocess_training_rewards(directory):
 	"""
 	go through the specified directory and compute the data needed for plotting
 	return time_step, rewards, confidence_interval
@@ -80,7 +80,7 @@ def prepro_training_rewards(directory):
 	return time_step, avg_rewards, ci
 
 
-def plot_training_data(normal, oracle, exp_name, data_type):
+def plot_training_data(normal, oracle, no_duplicate, exp_name, data_type):
 	"""
 	plot the normal DQN and oracle DQN results on the same graph
 	used to plot training g-score or reward
@@ -92,6 +92,10 @@ def plot_training_data(normal, oracle, exp_name, data_type):
 	if len(oracle[0]) != 0:
 		plt.plot(oracle[0], oracle[1], label='oracle {}'.format(data_type))
 		plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1, label="oracle 95% CI")
+	# draw original no duplication environment only if one was provided
+	if len(no_duplicate[0] != 0):
+		plt.plot(no_duplicate[0], no_duplicate[1], label='no duplicate {}'.format(data_type))
+		plt.fill_between(no_duplicate[0], no_duplicate[1] - no_duplicate[2], no_duplicate[1] + no_duplicate[2], alpha=.1, label="no duplicate 95% CI")
 	# plt.ylim((-1, 1))
 	plt.title('{} over time during training with {}'.format(data_type, exp_name))
 	plt.xlabel('training step')
@@ -108,7 +112,7 @@ def plot_all_learning_curves(results_dir, tag, param_tuned):
 	for subdir in os.listdir(results_dir):
 		if subdir.startswith(tag + param_tuned):
 			absolute_dir = results_dir + subdir
-			rewards = prepro_training_rewards(absolute_dir)
+			rewards = preprocess_training_rewards(absolute_dir)
 			plt.plot(rewards[0], rewards[1], label=subdir)
 			plt.fill_between(rewards[0], rewards[1] - rewards[2], rewards[1] + rewards[2], alpha=.1)
 	plt.title('learninge curves for all {}'.format(tag + param_tuned))
@@ -141,15 +145,17 @@ def main():
 		return
 
 	# preprocess the csv
-	normal_exp_gscore = prepro_g_score(directory)
-	oracle_exp_gscore = prepro_g_score(directory + "-oracle")
+	normal_exp_gscore = preprocess_g_score(directory)
+	oracle_exp_gscore = preprocess_g_score(directory + "-oracle")
+	no_duplicate_exp_gscore = preprocess_g_score(directory + '-nodup')
 	
-	normal_exp_reward = prepro_training_rewards(directory)
-	oracle_exp_reward = prepro_training_rewards(directory + "-oracle")
+	normal_exp_reward = preprocess_training_rewards(directory)
+	oracle_exp_reward = preprocess_training_rewards(directory + "-oracle")
+	no_duplicate_exp_reward = preprocess_training_rewards(directory + "-nodup")
 
 	# plot 
-	plot_training_data(normal_exp_gscore, oracle_exp_gscore, args.tag, "g difference")
-	plot_training_data(normal_exp_reward, oracle_exp_reward, args.tag, "rewards")
+	plot_training_data(normal_exp_gscore, oracle_exp_gscore, no_duplicate_exp_gscore, args.tag, "g difference")
+	plot_training_data(normal_exp_reward, oracle_exp_reward, no_duplicate_exp_reward, args.tag, "rewards")
 
 
 if __name__ == '__main__':
