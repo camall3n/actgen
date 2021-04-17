@@ -5,8 +5,8 @@ from .dqn import DQNAgent
 
 
 class ActionDQNAgent(DQNAgent):
-    def __init__(self, observation_space, action_space, params):
-        super().__init__(observation_space, action_space, params)
+    def __init__(self, env, params):
+        super().__init__(env, params)
 
     def _get_q_targets(self, batch):
         with torch.no_grad():
