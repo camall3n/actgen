@@ -40,6 +40,8 @@ class EvalTrial:
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--random_actions', default=False, action='store_true',
+                            help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
@@ -75,15 +77,20 @@ class EvalTrial:
         test_env = wrap.FixedDurationHack(test_env)
         if isinstance(test_env.action_space, gym.spaces.Box):
             test_env = wrap.DiscreteBox(test_env)
-        test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
+        if self.params['random_actions']:
+            logging.info('making all duplicate actions random actions')
+            test_env = wrap.RandomActions(test_env, self.params['duplicate'])
+        else:
+            logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
+            test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
         test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000+self.params['seed'], gym, test_env)
         self.test_env = test_env
 
         if self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = DQNAgent(test_env, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = ActionDQNAgent(test_env, self.params)
         
         self.all_rewards = []
 

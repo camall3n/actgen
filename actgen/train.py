@@ -48,6 +48,8 @@ class Trial:
                             help='what regularization method to use during training')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--random_actions', default=False, action='store_true',
+                            help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
@@ -87,7 +89,12 @@ class Trial:
         env = wrap.FixedDurationHack(env)
         if isinstance(env.action_space, gym.spaces.Box):
             env = wrap.DiscreteBox(env)
-        env = wrap.DuplicateActions(env, self.params['duplicate'])
+        if self.params['random_actions']:
+            logging.info('making all duplicate actions random actions')
+            env = wrap.RandomActions(env, self.params['duplicate'])
+        else:
+            logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
+            env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.TorchInterface(env)
         test_env = copy.deepcopy(env)
         seeding.seed(self.params['seed'], gym, env)
