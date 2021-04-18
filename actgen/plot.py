@@ -93,7 +93,7 @@ def plot_training_data(normal, oracle, no_duplicate, exp_name, data_type):
 		plt.plot(oracle[0], oracle[1], label='oracle {}'.format(data_type))
 		plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1, label="oracle 95% CI")
 	# draw original no duplication environment only if one was provided
-	if len(no_duplicate[0] != 0):
+	if len(no_duplicate[0]) != 0:
 		plt.plot(no_duplicate[0], no_duplicate[1], label='no duplicate {}'.format(data_type))
 		plt.fill_between(no_duplicate[0], no_duplicate[1] - no_duplicate[2], no_duplicate[1] + no_duplicate[2], alpha=.1, label="no duplicate 95% CI")
 	# plt.ylim((-1, 1))
