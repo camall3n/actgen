@@ -108,9 +108,9 @@ class Trial:
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(env, self.params)
+            self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(env, self.params)
+            self.agent = ActionDQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         self.best_score = -np.inf
 
         if self.params['regularization'] == 'l1':

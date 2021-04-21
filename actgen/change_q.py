@@ -84,9 +84,9 @@ class ManipulationTrial:
         self.test_env = test_env
 
         if self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(test_env, self.params)
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(test_env, self.params)
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         # load saved model
         if not self.params['test']:
             print("loading model from ", self.params['load'])

@@ -8,10 +8,10 @@ from .replaymemory import ReplayMemory
 
 
 class DQNAgent():
-    def __init__(self, env, params):
-        self.env = env
-        self.observation_space = env.observation_space
-        self.action_space = env.action_space
+    def __init__(self, observation_space, action_space, get_duplicate_actions, params):
+        self.observation_space = observation_space
+        self.action_space = action_space
+        self.get_duplicate_actions = get_duplicate_actions
         self.params = params
 
         self.replay = ReplayMemory(self.params['replay_buffer_size'])
@@ -90,7 +90,7 @@ class DQNAgent():
             # all duplicate actions are fully similar
             # for each action taken in the batch
             for i, acted in enumerate(action_taken):
-                all_duplicate_actions = self.env.get_duplicate_actions(acted)
+                all_duplicate_actions = self.get_duplicate_actions(acted)
                 similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
         return similarity_mat
 
