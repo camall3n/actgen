@@ -51,8 +51,8 @@ class DQNAgent():
         self.q.train()
         self.optimizer.zero_grad()
 
-        q_values = self._get_q_predictions(batch)
-        q_targets = self._get_q_targets(batch)
+        q_values = self._get_q_predictions(batch).to(self.params['device'])
+        q_targets = self._get_q_targets(batch).to(self.params['device'])
 
         loss = torch.nn.functional.smooth_l1_loss(input=q_values, target=q_targets)
         param = torch.cat([x.view(-1) for x in self.q.parameters()])
@@ -84,7 +84,7 @@ class DQNAgent():
         return tensor of size (batch_size, n_actions) with values between 0 and 1.
         1 if "fully similar"; 0 if "fully different".
         """
-        action_taken = torch.tensor(batch.action)
+        action_taken = torch.tensor(batch.action).to(self.params['device'])
         similarity_mat = one_hot(action_taken, self.action_space.n)  # (batch_size, n_actions)
         if self.params['oracle']:
             # all duplicate actions are fully similar
@@ -97,11 +97,11 @@ class DQNAgent():
     def _get_q_targets(self, batch):
         with torch.no_grad():
             # Compute Double-Q targets
-            next_state = torch.stack(batch.next_state).float()  # (batch_size, dim_state)
+            next_state = torch.stack(batch.next_state).float().to(self.params['device'])  # (batch_size, dim_state)
             ap = torch.argmax(self.q(next_state), dim=-1)  # (batch_size, )
             vp = self.q_target(next_state).gather(-1, ap.unsqueeze(-1)).squeeze(-1)  # (batch_size, )
-            not_done_idx = ~torch.stack(batch.done)  # (batch_size, )
-            q_targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx  # (batch_size, )
+            not_done_idx = ~torch.stack(batch.done).to(self.params['device'])  # (batch_size, )
+            q_targets = torch.stack(batch.reward).to(self.params['device']) + self.params['gamma'] * vp * not_done_idx  # (batch_size, )
             if self.params['dqn_train_pin_other_q_values']:
                 q_predictions = self._get_q_predictions(batch)  # (batch_size, n_actions)
                 action_similarities = self._get_action_similarities(batch)  # (batch_size, n_actions)
@@ -111,14 +111,14 @@ class DQNAgent():
         return q_targets
 
     def _get_q_predictions(self, batch):
-        q_values = self.q(torch.stack(batch.state).float())  # (batch_size, n_actions)
+        q_values = self.q(torch.stack(batch.state).float().to(self.params['device']))  # (batch_size, n_actions)
         if self.params['dqn_train_pin_other_q_values']:
             return q_values
         q_acted = extract(q_values, idx=torch.stack(batch.action).long(), idx_dim=-1)  #(batch_size,)
         return q_acted
 
     def _get_q_values_for_state(self, x):
-        return self.q(torch.as_tensor(x).float())
+        return self.q(torch.as_tensor(x).float().to(self.params['device']))
 
     def _make_qnet(self, n_features, n_actions, params):
         dropout = params['dropout_rate']
@@ -126,4 +126,5 @@ class DQNAgent():
                    n_outputs=n_actions,
                    n_hidden_layers=params['n_hidden_layers'],
                    n_units_per_layer=params['n_units_per_layer'],
+                   device=params['device'],
                    dropout=dropout)

@@ -95,7 +95,7 @@ class Network(torch.nn.Module):
 
 class MLP(Network):
     def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, 
-                dropout=False):
+                device, dropout=False):
         super().__init__()
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
@@ -117,7 +117,7 @@ class MLP(Network):
             torch.nn.Linear(n_units_per_layer, n_outputs)
         ]
 
-        self.model = Sequential(*layers)
+        self.model = Sequential(*layers).to(device)
 
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
