@@ -80,22 +80,28 @@ def preprocess_training_rewards(directory):
 	return time_step, avg_rewards, ci
 
 
-def plot_training_data(normal, oracle, no_duplicate, exp_name, data_type):
+def plot_training_data(normal, oracle, no_duplicate, rand, rand_oracle, exp_name, data_type):
 	"""
 	plot the normal DQN and oracle DQN results on the same graph
 	used to plot training g-score or reward
 	"""
 	plt.figure()
-	plt.plot(normal[0], normal[1], label='normal {}'.format(data_type))
-	plt.fill_between(normal[0], normal[1] - normal[2], normal[1] + normal[2], alpha=.1, label="normal 95% CI")
+	plt.plot(normal[0], normal[1], label='N copy')
+	plt.fill_between(normal[0], normal[1] - normal[2], normal[1] + normal[2], alpha=.1)
 	# draw oracle only if one was provided
 	if len(oracle[0]) != 0:
-		plt.plot(oracle[0], oracle[1], label='oracle {}'.format(data_type))
-		plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1, label="oracle 95% CI")
+		plt.plot(oracle[0], oracle[1], label='N copy with oracle')
+		plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1)
 	# draw original no duplication environment only if one was provided
 	if len(no_duplicate[0]) != 0:
-		plt.plot(no_duplicate[0], no_duplicate[1], label='no duplicate {}'.format(data_type))
-		plt.fill_between(no_duplicate[0], no_duplicate[1] - no_duplicate[2], no_duplicate[1] + no_duplicate[2], alpha=.1, label="no duplicate 95% CI")
+		plt.plot(no_duplicate[0], no_duplicate[1], label='regular')
+		plt.fill_between(no_duplicate[0], no_duplicate[1] - no_duplicate[2], no_duplicate[1] + no_duplicate[2], alpha=.1)
+	if len(rand[0]) != 0:
+		plt.plot(rand[0], rand[1], label='N copy with random actions')
+		plt.fill_between(rand[0], rand[1] - rand[2], rand[1] + rand[2], alpha=.1)
+	if len(rand_oracle[0]) != 0:
+		plt.plot(rand_oracle[0], rand_oracle[1], label='N copy with random actions with oracle')
+		plt.fill_between(rand_oracle[0], rand_oracle[1] - rand_oracle[2], rand_oracle[1] + rand_oracle[2], alpha=.1)
 	# plt.ylim((-1, 1))
 	plt.title('{} over time during training with {}'.format(data_type, exp_name))
 	plt.xlabel('training step')
@@ -148,14 +154,18 @@ def main():
 	normal_exp_gscore = preprocess_g_score(directory)
 	oracle_exp_gscore = preprocess_g_score(directory + "-oracle")
 	no_duplicate_exp_gscore = preprocess_g_score(directory + '-nodup')
+	rand_exp_gscore = preprocess_g_score(directory + "-rand")
+	rand_oracle_exp_gscore = preprocess_g_score(directory + "-rand-oracle")
 	
 	normal_exp_reward = preprocess_training_rewards(directory)
 	oracle_exp_reward = preprocess_training_rewards(directory + "-oracle")
 	no_duplicate_exp_reward = preprocess_training_rewards(directory + "-nodup")
+	rand_exp_reward = preprocess_training_rewards(directory + "-rand")
+	rand_oracle_exp_reward = preprocess_training_rewards(directory + "-rand-oracle")
 
 	# plot 
-	plot_training_data(normal_exp_gscore, oracle_exp_gscore, no_duplicate_exp_gscore, args.tag, "g difference")
-	plot_training_data(normal_exp_reward, oracle_exp_reward, no_duplicate_exp_reward, args.tag, "rewards")
+	plot_training_data(normal_exp_gscore, oracle_exp_gscore, no_duplicate_exp_gscore, rand_exp_gscore, rand_oracle_exp_gscore, args.tag, "g difference")
+	plot_training_data(normal_exp_reward, oracle_exp_reward, no_duplicate_exp_reward, rand_exp_reward, rand_oracle_exp_reward, args.tag, "rewards")
 
 
 if __name__ == '__main__':
