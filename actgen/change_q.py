@@ -122,7 +122,7 @@ class ManipulationTrial:
         s, done = self.test_env.reset(), False
         for _ in tqdm(range(self.params['n_gscore_states'])):
             # figure out what the nest state is
-            action_taken = self.agent.act(s)
+            action_taken = self.agent.act(s).to(torch.device('cpu'))
             sp, r, done, _ = self.test_env.step(action_taken)
             s = sp if not done else self.test_env.reset()
             states.append(s)

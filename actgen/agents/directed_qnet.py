@@ -19,6 +19,7 @@ class DirectedQNet(MLP):
         self.agent_type = agent_type
         self.pin_other_q_values = pin_other_q_values
         self.device = device
+        self.model = self.model.to(device)
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
