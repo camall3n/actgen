@@ -12,7 +12,7 @@ gamma,0.99,float
 batch_size,16,int
 n_hidden_layers,2,int
 n_units_per_layer,256,int
-target_copy_tau,0.01,float
+target_copy_tau,0.005,float
 replay_warmup_steps,500,int
 replay_buffer_size,50000,int
 regularization_weight_l1,0.5,float
