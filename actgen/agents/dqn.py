@@ -64,9 +64,14 @@ class DQNAgent():
         self.optimizer.step()
 
         self.n_training_steps += 1
-        self.q_target.soft_copy_from(self.q, self.params['target_copy_tau'])
-        # if self.n_training_steps % self.params['target_copy_period'] == 0:
-        #     self.q_target.hard_copy_from(self.q)
+
+        if self.params['use_soft_copy']:
+            # soft copy
+            self.q_target.soft_copy_from(self.q, self.params['target_copy_tau'])
+        else:
+            # hard copy
+            if self.n_training_steps % self.params['target_copy_period'] == 0:
+                self.q_target.hard_copy_from(self.q)
 
         return loss.detach().item()
 
