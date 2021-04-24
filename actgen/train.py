@@ -156,7 +156,7 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s, testing=True)
+                a = self.agent.act(s, testing=True).to(torch.device('cpu'))
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
@@ -197,7 +197,7 @@ class Trial:
         s, done = self.test_env.reset(), False
         for _ in range(self.params['n_gscore_states']):
             # figure out what the nest state is
-            action_taken = self.agent.act(s)
+            action_taken = self.agent.act(s).to(torch.device('cpu'))
             sp, r, done, _ = self.test_env.step(action_taken)
             s = sp if not done else self.test_env.reset()
             states.append(s)
@@ -243,7 +243,7 @@ class Trial:
     def run(self):
         s, done, t = self.env.reset(), False, 0
         for step in tqdm(range(self.params['max_env_steps'])):
-            a = self.agent.act(s)
+            a = self.agent.act(s).to(torch.device('cpu'))
             sp, r, done, _ = self.env.step(a)
             t = t + 1
             terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done
