@@ -131,5 +131,4 @@ class DQNAgent():
                    n_outputs=n_actions,
                    n_hidden_layers=params['n_hidden_layers'],
                    n_units_per_layer=params['n_units_per_layer'],
-                   device=params['device'],
-                   dropout=dropout)
+                   dropout=dropout).to(params['device'])

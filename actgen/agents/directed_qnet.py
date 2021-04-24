@@ -58,7 +58,7 @@ class DirectedQNet(MLP):
                             get_current_q_vals = lambda s: self.forward(s.float())  # (1, n_actions)
                         else:
                             a = torch.as_tensor([a])  #(1)
-                            q_target = extract(q_target, a, idx_dim=-1).to(self.device)  # (1)
+                            q_target = extract(q_target, a, idx_dim=-1)  # (1)
                             get_current_q_vals = lambda s: extract(self.forward(s.float()), a, idx_dim=-1)  # (1)
 
                     # update for flipped DQN
