@@ -5,22 +5,22 @@ from .dqn import DQNAgent
 
 
 class ActionDQNAgent(DQNAgent):
-    def __init__(self, observation_space, action_space, get_duplicate_actions, params):
-         super().__init__(observation_space, action_space, get_duplicate_actions, params)
+    def __init__(self, observation_space, action_space, get_duplicate_actions_fn, params):
+         super().__init__(observation_space, action_space, get_duplicate_actions_fn, params)
 
     def _get_q_targets(self, batch):
         with torch.no_grad():
             # Compute Double-Q targets
             next_states = torch.stack(batch.next_state, dim=0).float().to(self.params['device'])
-            aps = []
+            next_actions = []
             for s in next_states:
                 q_values = self._get_q_values_for_state(s).squeeze().float()
                 ap = torch.argmax(q_values, dim=0)
-                aps.append(ap)
-            aps = torch.as_tensor(aps).to(self.params['device'])
-            aps_one_hot = one_hot(aps, self.action_space.n)
-            assert aps_one_hot.shape == (len(aps), self.action_space.n)
-            vp = self.q_target(torch.cat([next_states, aps_one_hot], dim=-1).float()).squeeze(-1)
+                next_actions.append(ap)
+            next_actions = torch.as_tensor(next_actions).to(self.params['device'])
+            next_actions_one_hot = one_hot(next_actions, self.action_space.n)
+            assert next_actions_one_hot.shape == (len(next_actions), self.action_space.n)
+            vp = self.q_target(torch.cat([next_states, next_actions_one_hot], dim=-1).float()).squeeze(-1)
             not_done_idx = ~torch.stack(batch.done).to(self.params['device'])
             targets = torch.stack(batch.reward) + self.params['gamma'] * vp * not_done_idx
         return targets.unsqueeze(-1)
