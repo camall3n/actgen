@@ -46,6 +46,8 @@ def preprocess_g_score(directory):
 	# each row of g_difference contains an example
 	if len(g_difference) == 0:
 		raise RuntimeWarning("no training gscore csv files found in the specified directory")
+	if len(g_difference.shape) == 1:
+		return time_step, g_difference, 0  # if only 1 example
 	avg_g_difference = np.mean(g_difference, axis=0)
 	ci = 1.96 * np.std(g_difference, axis=0) / math.sqrt(len(g_difference))
 	return time_step, avg_g_difference, ci
@@ -75,10 +77,42 @@ def preprocess_training_rewards(directory):
 	# each row of g_difference contains an example
 	if len(rewards) == 0:
 		raise RuntimeWarning("no training reward csv files found in the specified tag directory")
+	if len(rewards.shape) == 1:
+		return time_step, rewards, 0  # if only 1 example
 	avg_rewards = np.mean(rewards, axis=0)
 	ci = 1.96 * np.std(rewards, axis=0) / math.sqrt(len(rewards))
 	return time_step, avg_rewards, ci
 
+
+def preprocess_training_loss(directory):
+	"""
+	go through the specified directory, and get the training loss
+	return time_step, loss, confidence_interval
+	"""
+	if not os.path.exists(directory):
+		logging.info("directory {} not found".format(directory))
+		return [], [], []
+	time_step = np.array([])
+	loss = np.array([])
+		# iterate over the directory
+	for file_name in os.listdir(directory):
+		# find all the saved gscore files
+		if file_name.endswith("training_loss.csv"):
+			file_path = os.path.join(directory, file_name)
+			step, l = read_csv(file_path)
+			if len(time_step) == 0:
+				time_step = step
+			assert time_step.all() == step.all()
+			loss = l if len(loss) == 0 else np.vstack([loss, l])
+	# average the loss and get 95% confidence interval
+	# each row of loss contains an example
+	if len(loss) == 0:
+		logging.info("no training loss csv files found in the specified tag directory")
+	if len(loss.shape) == 1:
+		return time_step, loss, 0  # if only 1 example
+	avg_loss = np.mean(loss, axis=0)
+	ci = 1.96 * np.std(loss, axis=0) / math.sqrt(len(loss))
+	return time_step, avg_loss, ci
 
 def plot_training_data(normal, oracle, no_duplicate, rand, rand_oracle, exp_name, data_type):
 	"""
@@ -106,6 +140,20 @@ def plot_training_data(normal, oracle, no_duplicate, rand, rand_oracle, exp_name
 	plt.title('{} over time during training with {}'.format(data_type, exp_name))
 	plt.xlabel('training step')
 	plt.ylabel('{}'.format(data_type))
+	plt.legend()
+	plt.show()
+
+
+def plot_training_loss(time_step, loss, ci):
+	"""
+	plot the loss over training process
+	"""
+	plt.figure()
+	plt.plot(time_step, loss, label='training loss')
+	plt.fill_between(time_step, loss-ci, loss+ci, alpha=.1)
+	plt.title('training loss')
+	plt.xlabel('training step')
+	plt.ylabel('loss')
 	plt.legend()
 	plt.show()
 
@@ -150,22 +198,27 @@ def main():
 		plot_all_learning_curves(args.results_dir, args.tag, param_tuned='-lr')
 		return
 
-	# preprocess the csv
+	# preprocess the g-score
 	normal_exp_gscore = preprocess_g_score(directory)
 	oracle_exp_gscore = preprocess_g_score(directory + "-oracle")
 	no_duplicate_exp_gscore = preprocess_g_score(directory + '-nodup')
 	rand_exp_gscore = preprocess_g_score(directory + "-rand")
 	rand_oracle_exp_gscore = preprocess_g_score(directory + "-rand-oracle")
 	
+	# preprocess the reward
 	normal_exp_reward = preprocess_training_rewards(directory)
 	oracle_exp_reward = preprocess_training_rewards(directory + "-oracle")
 	no_duplicate_exp_reward = preprocess_training_rewards(directory + "-nodup")
 	rand_exp_reward = preprocess_training_rewards(directory + "-rand")
 	rand_oracle_exp_reward = preprocess_training_rewards(directory + "-rand-oracle")
 
+	# preprocess the loss
+	exp_loss = preprocess_training_loss(directory)
+
 	# plot 
 	plot_training_data(normal_exp_gscore, oracle_exp_gscore, no_duplicate_exp_gscore, rand_exp_gscore, rand_oracle_exp_gscore, args.tag, "g difference")
 	plot_training_data(normal_exp_reward, oracle_exp_reward, no_duplicate_exp_reward, rand_exp_reward, rand_oracle_exp_reward, args.tag, "rewards")
+	plot_training_loss(*exp_loss)
 
 
 if __name__ == '__main__':

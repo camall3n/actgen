@@ -231,6 +231,14 @@ class Trial:
             if step == 0:  # write header
                 csv_writer.writerow(['training step', 'reward during evaluation callback'])
             csv_writer.writerow([step, r])
+    
+    def save_batch_loss(self, step, loss):
+        mode = 'w' if step == 0 else 'a'
+        with open(self.experiment_dir + self.file_name + "_training_loss.csv", mode) as f:
+            csv_writer = csv.writer(f)
+            if step == 0:  # write header
+                csv_writer.writerow(['training step', 'batch loss'])
+            csv_writer.writerow([step, loss])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
@@ -246,6 +254,7 @@ class Trial:
             else:
                 s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
+            utils.every_n_times(self.params['eval_every_n_steps'], step, self.save_batch_loss, step, loss)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
         self.teardown()
