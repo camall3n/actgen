@@ -11,7 +11,7 @@ class DirectedQNet(MLP):
     """
     def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, device,
                  lr, agent_type, pin_other_q_values, optim='sgd'):
-        super().__init__(n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, device)
+        super().__init__(n_inputs, n_outputs, n_hidden_layers, n_units_per_layer)
         assert optim in ['sgd', 'adam']
         self.optim = optim
         self.lr = lr
