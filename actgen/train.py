@@ -64,8 +64,8 @@ class Trial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
-        parser.add_argument('--gpu', default=False, action='store_true',
-                            help='Run training on GPU')
+        parser.add_argument('--disable_gpu', default=False, action='store_true',
+                            help='enforce training on CPU')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -107,14 +107,8 @@ class Trial:
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
         
-        if self.params['gpu']:
-            if torch.cuda.is_available():
-                torch.backends.cudnn.benchmark = True
-                self.params['device'] = torch.device('cuda')
-            else:
-                raise RuntimeError('there is no GPU available')
-        else:
-            self.params['device'] = torch.device('cpu')
+        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
+        logging.info('training on device {}'.format(self.params['device']))
 
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)

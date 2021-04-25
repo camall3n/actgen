@@ -4,6 +4,7 @@ from distutils.util import strtobool
 import logging
 from pydoc import locate
 
+import torch
 from matplotlib import pyplot as plt
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
@@ -56,3 +57,11 @@ def update_param(params, name, value):
 def every_n_times(n, count, callback, *args, final_count=None):
     if (count % n == 0) or (final_count is not None and (count == final_count)):
         callback(*args)
+
+
+def determine_device(disable_gpu):
+    if disable_gpu or not torch.cuda.is_available():
+        return torch.device('cpu')
+    else:
+        torch.backends.cudnn.benchmark = True
+        return torch.device('cuda')
