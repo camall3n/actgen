@@ -11,7 +11,7 @@ class DirectedQNet(MLP):
     """
     def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, device,
                  lr, agent_type, pin_other_q_values, optim='sgd'):
-        super().__init__(n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, device)
+        super().__init__(n_inputs, n_outputs, n_hidden_layers, n_units_per_layer)
         assert optim in ['sgd', 'adam']
         self.optim = optim
         self.lr = lr
@@ -19,6 +19,7 @@ class DirectedQNet(MLP):
         self.agent_type = agent_type
         self.pin_other_q_values = pin_other_q_values
         self.device = device
+        self.model = self.model.to(device)
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
@@ -58,7 +59,7 @@ class DirectedQNet(MLP):
                             get_current_q_vals = lambda s: self.forward(s.float())  # (1, n_actions)
                         else:
                             a = torch.as_tensor([a])  #(1)
-                            q_target = extract(q_target, a, idx_dim=-1).to(self.device)  # (1)
+                            q_target = extract(q_target, a, idx_dim=-1)  # (1)
                             get_current_q_vals = lambda s: extract(self.forward(s.float()), a, idx_dim=-1)  # (1)
 
                     # update for flipped DQN
@@ -101,7 +102,7 @@ class DirectedQNet(MLP):
                     new_q_values = self.forward(qnet_input.to(self.params['device'])).squeeze()  # (n_actions)
                     assert new_q_values.shape == (len(actions), )
                 # update q_delta matrix
-                q_delta[s_idx, a_idx, :] = new_q_values.detach().numpy().squeeze() - original_q_values.detach().numpy().squeeze()
+                q_delta[s_idx, a_idx, :] = new_q_values.detach().to(torch.device('cpu')).numpy().squeeze() - original_q_values.detach().to(torch.device('cpu')).numpy().squeeze()
         return q_delta
 
     def forward(self, *args, **kwargs):

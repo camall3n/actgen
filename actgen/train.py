@@ -64,8 +64,8 @@ class Trial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
-        parser.add_argument('--gpu', default=False, action='store_true',
-                            help='Run training on GPU')
+        parser.add_argument('--disable_gpu', default=False, action='store_true',
+                            help='enforce training on CPU')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -107,14 +107,8 @@ class Trial:
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
         
-        if self.params['gpu']:
-            if torch.cuda.is_available():
-                torch.backends.cudnn.benchmark = True
-                self.params['device'] = torch.device('cuda')
-            else:
-                raise RuntimeError('there is no GPU available')
-        else:
-            self.params['device'] = torch.device('cpu')
+        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
+        logging.info('training on device {}'.format(self.params['device']))
 
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
@@ -156,7 +150,7 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s, testing=True)
+                a = self.agent.act(s, testing=True).to(torch.device('cpu'))
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
@@ -197,7 +191,7 @@ class Trial:
         s, done = self.test_env.reset(), False
         for _ in range(self.params['n_gscore_states']):
             # figure out what the nest state is
-            action_taken = self.agent.act(s)
+            action_taken = self.agent.act(s).to(torch.device('cpu'))
             sp, r, done, _ = self.test_env.step(action_taken)
             s = sp if not done else self.test_env.reset()
             states.append(s)
@@ -243,7 +237,7 @@ class Trial:
     def run(self):
         s, done, t = self.env.reset(), False, 0
         for step in tqdm(range(self.params['max_env_steps'])):
-            a = self.agent.act(s)
+            a = self.agent.act(s).to(torch.device('cpu'))
             sp, r, done, _ = self.env.step(a)
             t = t + 1
             terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done

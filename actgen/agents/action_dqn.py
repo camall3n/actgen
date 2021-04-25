@@ -17,7 +17,7 @@ class ActionDQNAgent(DQNAgent):
                 q_values = self._get_q_values_for_state(s).squeeze().float()
                 ap = torch.argmax(q_values, dim=0)
                 next_actions.append(ap)
-            next_actions = torch.as_tensor(next_actions).to(self.params['device'])
+            next_actions = torch.stack(next_actions)
             next_actions_one_hot = one_hot(next_actions, self.action_space.n)
             assert next_actions_one_hot.shape == (len(next_actions), self.action_space.n)
             vp = self.q_target(torch.cat([next_states, next_actions_one_hot], dim=-1).float()).squeeze(-1)
@@ -46,5 +46,4 @@ class ActionDQNAgent(DQNAgent):
                    n_outputs=1,
                    n_hidden_layers=params['n_hidden_layers'],
                    n_units_per_layer=params['n_units_per_layer'],
-                   device=params['device'],
-                   dropout=dropout)
+                   dropout=dropout).to(params['device'])
