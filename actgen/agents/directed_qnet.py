@@ -19,7 +19,6 @@ class DirectedQNet(MLP):
         self.agent_type = agent_type
         self.pin_other_q_values = pin_other_q_values
         self.device = device
-        self.model = self.model.to(device)
 
     def directed_update(self, states, actions, delta_update, n_updates, baseline_qnet):
         """
@@ -102,7 +101,7 @@ class DirectedQNet(MLP):
                     new_q_values = self.forward(qnet_input.to(self.params['device'])).squeeze()  # (n_actions)
                     assert new_q_values.shape == (len(actions), )
                 # update q_delta matrix
-                q_delta[s_idx, a_idx, :] = new_q_values.detach().to(torch.device('cpu')).numpy().squeeze() - original_q_values.detach().to(torch.device('cpu')).numpy().squeeze()
+                q_delta[s_idx, a_idx, :] = new_q_values.detach().cpu().numpy().squeeze() - original_q_values.detach().cpu().numpy().squeeze()
         return q_delta
 
     def forward(self, *args, **kwargs):

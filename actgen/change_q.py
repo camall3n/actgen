@@ -116,7 +116,7 @@ class ManipulationTrial:
         s, done = self.test_env.reset(), False
         for _ in tqdm(range(self.params['n_gscore_states'])):
             # figure out what the nest state is
-            action_taken = self.agent.act(s).to(torch.device('cpu'))
+            action_taken = self.agent.act(s).cpu()
             sp, r, done, _ = self.test_env.step(action_taken)
             s = sp if not done else self.test_env.reset()
             states.append(s)
@@ -136,7 +136,7 @@ class ManipulationTrial:
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
                              optim=self.params['gscore_optimizer'],
-                             pin_other_q_values=self.params['pin_other_q_values'])
+                             pin_other_q_values=self.params['pin_other_q_values']).to(self.params['device'])
         q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
 
         # write to csv of direction of change (both for an average state)
