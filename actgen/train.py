@@ -48,6 +48,8 @@ class Trial:
                             help='what regularization method to use during training')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--random_actions', default=False, action='store_true',
+                            help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
@@ -62,6 +64,8 @@ class Trial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
+        parser.add_argument('--disable_gpu', default=False, action='store_true',
+                            help='enforce training on CPU')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -87,7 +91,12 @@ class Trial:
         env = wrap.FixedDurationHack(env)
         if isinstance(env.action_space, gym.spaces.Box):
             env = wrap.DiscreteBox(env)
-        env = wrap.DuplicateActions(env, self.params['duplicate'])
+        if self.params['random_actions']:
+            logging.info('making all duplicate actions random actions')
+            env = wrap.RandomActions(env, self.params['duplicate'])
+        else:
+            logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
+            env = wrap.DuplicateActions(env, self.params['duplicate'])
         env = wrap.TorchInterface(env)
         test_env = copy.deepcopy(env)
         seeding.seed(self.params['seed'], gym, env)
@@ -97,13 +106,16 @@ class Trial:
 
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
+        
+        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
+        logging.info('training on device {}'.format(self.params['device']))
 
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(env.observation_space, env.action_space, self.params)
+            self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(env.observation_space, env.action_space, self.params)
+            self.agent = ActionDQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         self.best_score = -np.inf
 
         if self.params['regularization'] == 'l1':
@@ -138,7 +150,7 @@ class Trial:
         for ep in range(self.params['n_eval_episodes']):
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
-                a = self.agent.act(s, testing=True)
+                a = self.agent.act(s, testing=True).cpu()
                 sp, r, done, _ = self.test_env.step(a)
                 s, G, t = sp, G + r, t + 1
             ep_scores.append(G.detach())
@@ -167,10 +179,11 @@ class Trial:
                              n_outputs=n_outputs,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
+                             device=self.params['device'],
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
                              optim=self.params['gscore_optimizer'],
-                             pin_other_q_values=self.params['pin_other_q_values'])
+                             pin_other_q_values=self.params['pin_other_q_values']).to(self.params['device'])
 
         # perform directed q-update for each action, across multiple states
         actions = list(range(self.test_env.action_space.n))
@@ -178,7 +191,7 @@ class Trial:
         s, done = self.test_env.reset(), False
         for _ in range(self.params['n_gscore_states']):
             # figure out what the nest state is
-            action_taken = self.agent.act(s)
+            action_taken = self.agent.act(s).cpu()
             sp, r, done, _ = self.test_env.step(action_taken)
             s = sp if not done else self.test_env.reset()
             states.append(s)
@@ -212,11 +225,19 @@ class Trial:
             if step == 0:  # write header
                 csv_writer.writerow(['training step', 'reward during evaluation callback'])
             csv_writer.writerow([step, r])
+    
+    def save_batch_loss(self, step, loss):
+        mode = 'w' if step == 0 else 'a'
+        with open(self.experiment_dir + self.file_name + "_training_loss.csv", mode) as f:
+            csv_writer = csv.writer(f)
+            if step == 0:  # write header
+                csv_writer.writerow(['training step', 'batch loss'])
+            csv_writer.writerow([step, loss])
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
         for step in tqdm(range(self.params['max_env_steps'])):
-            a = self.agent.act(s)
+            a = self.agent.act(s).cpu()
             sp, r, done, _ = self.env.step(a)
             t = t + 1
             terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done
@@ -227,6 +248,7 @@ class Trial:
             else:
                 s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
+            utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
         self.teardown()

@@ -4,6 +4,7 @@ from distutils.util import strtobool
 import logging
 from pydoc import locate
 
+import torch
 from matplotlib import pyplot as plt
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
@@ -58,30 +59,9 @@ def every_n_times(n, count, callback, *args, final_count=None):
         callback(*args)
 
 
-def plot_training_gscore(fname='results/training_gscore.csv'):
-    """
-    plot the +/- g score over time as training proceeds
-    """
-    with open(fname, 'r') as f:
-        reader = csv.reader(f)
-        g_scores = list(reader)
-        time = [int(i[0]) for i in g_scores]
-        plus_g = [float(i[1]) for i in g_scores]
-        minus_g = [float(i[2]) for i in g_scores]
-        ratio = [plus_g[i] / minus_g[i] for i in range(len(plus_g))]
-        diff = [plus_g[i] - minus_g[i] for i in range(len(plus_g))]
-
-        plt.figure()
-        plt.plot(time, plus_g, label='+g')
-        plt.plot(time, minus_g, label='-g')
-        # plt.plot(time, ratio, 'g', label='ratio')
-        plt.plot(time, diff, 'r', label='difference')
-        plt.title('g score over time during training with SGD')
-        plt.xlabel('training step')
-        plt.ylabel('g score')
-        plt.legend()
-        plt.show()
-
-
-if __name__ == '__main__':
-    plot_training_gscore()
+def determine_device(disable_gpu):
+    if disable_gpu or not torch.cuda.is_available():
+        return torch.device('cpu')
+    else:
+        torch.backends.cudnn.benchmark = True
+        return torch.device('cuda')

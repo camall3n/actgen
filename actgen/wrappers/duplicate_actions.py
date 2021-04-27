@@ -28,6 +28,14 @@ class DuplicateActions(gym.Wrapper):
         # the corresponding original action of the original env
         original_a = math.floor(action / self.n_dup)
         return self.env.step(original_a)
+    
+    def get_duplicate_actions(self, a):
+        """
+        return all the actions that's a duplicate 'a' in a list
+        """
+        original_env_a = math.floor(a / self.n_dup)
+        all_duplicate_actions = list(range(original_env_a * self.n_dup, original_env_a * self.n_dup + self.n_dup))
+        return all_duplicate_actions
 
 
 def test_duplicate_action_env():

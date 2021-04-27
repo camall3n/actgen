@@ -70,3 +70,4 @@ def plot_confusion_matrix(mat, num_duplicate, num_states):
     plt.imshow(mat)
     plt.colorbar()
     plt.show()
+    

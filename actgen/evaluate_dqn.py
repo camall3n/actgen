@@ -40,6 +40,8 @@ class EvalTrial:
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--random_actions', default=False, action='store_true',
+                            help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
                             help='Random seed')
         parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
@@ -50,6 +52,8 @@ class EvalTrial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
+        parser.add_argument('--disable_gpu', default=False, action='store_true',
+                            help='enforce training on CPU')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -75,15 +79,23 @@ class EvalTrial:
         test_env = wrap.FixedDurationHack(test_env)
         if isinstance(test_env.action_space, gym.spaces.Box):
             test_env = wrap.DiscreteBox(test_env)
-        test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
+        if self.params['random_actions']:
+            logging.info('making all duplicate actions random actions')
+            test_env = wrap.RandomActions(test_env, self.params['duplicate'])
+        else:
+            logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
+            test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
         test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000+self.params['seed'], gym, test_env)
         self.test_env = test_env
+       
+        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
+        logging.info('evaluating on device {}'.format(self.params['device']))
 
         if self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         
         self.all_rewards = []
 
@@ -105,7 +117,7 @@ class EvalTrial:
                 for _ in range(self.params['n_eval_episodes']):
                     s, G, done, t = self.test_env.reset(), 0, False, 0
                     while not done:
-                        a = self.agent.act(s, testing=True)
+                        a = self.agent.act(s, testing=True).cpu()
                         sp, r, done, _ = self.test_env.step(a)
                         s, G, t = sp, G + r, t + 1
                     ep_scores.append(G.detach())

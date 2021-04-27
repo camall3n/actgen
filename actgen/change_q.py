@@ -53,6 +53,8 @@ class ManipulationTrial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
+        parser.add_argument('--disable_gpu', default=False, action='store_true',
+                            help='enforce training on CPU')
         args, unknown = parser.parse_known_args()
         other_args = {
             (utils.remove_prefix(key, '--'), val)
@@ -82,11 +84,14 @@ class ManipulationTrial:
         test_env = wrap.TorchInterface(test_env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
+         
+        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
+        logging.info('change_q on device {}'.format(self.params['device']))
 
         if self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, self.params)
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         # load saved model
         if not self.params['test']:
             print("loading model from ", self.params['load'])
@@ -111,7 +116,7 @@ class ManipulationTrial:
         s, done = self.test_env.reset(), False
         for _ in tqdm(range(self.params['n_gscore_states'])):
             # figure out what the nest state is
-            action_taken = self.agent.act(s)
+            action_taken = self.agent.act(s).cpu()
             sp, r, done, _ = self.test_env.step(action_taken)
             s = sp if not done else self.test_env.reset()
             states.append(s)
@@ -127,10 +132,11 @@ class ManipulationTrial:
                              n_outputs=n_outputs,
                              n_hidden_layers=self.params['n_hidden_layers'],
                              n_units_per_layer=self.params['n_units_per_layer'],
+                             device=self.params['device'],
                              lr=self.params['learning_rate'],
                              agent_type=self.params['agent'],
                              optim=self.params['gscore_optimizer'],
-                             pin_other_q_values=self.params['pin_other_q_values'])
+                             pin_other_q_values=self.params['pin_other_q_values']).to(self.params['device'])
         q_deltas = q_net.directed_update(states, actions, self.params['delta_update'], self.params['num_update'], self.agent.q)
 
         # write to csv of direction of change (both for an average state)
