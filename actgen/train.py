@@ -12,15 +12,14 @@ import torch
 from tqdm import tqdm
 
 from . import utils
-from . import wrappers as wrap
 from .agents import RandomAgent, DQNAgent, DirectedQNet, ActionDQNAgent
-from .utils import Experience
+from .utils import Experience, Trial
 from .gscore import calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
 
 
-class Trial:
+class TrainTrial(Trial):
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
@@ -34,70 +33,9 @@ class Trial:
             self.params['gscore'] = True
         self.setup()
 
-    def parse_args(self):
-        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        # yapf: disable
-        parser.add_argument('--env_name', type=str, default='CartPole-v0',
-                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2'],
-                            help='Which gym environment to use')
-        parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random', 'action_dqn'],
-                            help='Which agent to use')
-        parser.add_argument('--regularization', type=str, default='None',
-                            choices=['None', 'l1', 'l2', 'dropout'],
-                            help='what regularization method to use during training')
-        parser.add_argument('--duplicate', '-d', type=int, default=5,
-                            help='Number of times to duplicate actions')
-        parser.add_argument('--random_actions', default=False, action='store_true',
-                            help='Make the duplicate actions all random actions')
-        parser.add_argument('--seed', '-s', type=int, default=0,
-                            help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
-                            help='Path to hyperparameters csv file')
-        parser.add_argument('--test', default=False, action='store_true',
-                            help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--gscore', default=False, action='store_true',
-                            help='Calculate the g-score vs time as training proceeds')
-        parser.add_argument('--oracle', default=False, action='store_true',
-                            help='to perform oracle action generalization')
-        parser.add_argument('--results_dir', type=str, default='./results/',
-                            help='Path to the result directory to save model files')
-        parser.add_argument('--tag', type=str, default='default_exp',
-                            help='A tag for the current experiment, used as a subdirectory name for saving models')
-        parser.add_argument('--disable_gpu', default=False, action='store_true',
-                            help='enforce training on CPU')
-        args, unknown = parser.parse_known_args()
-        other_args = {
-            (utils.remove_prefix(key, '--'), val)
-            for (key, val) in zip(unknown[::2], unknown[1::2])
-        }
-        args.other_args = other_args
-        # yapf: enable
-        return args
-
-    def load_hyperparams(self, args):
-        params = utils.load_hyperparams(args.hyperparams)
-        for arg_name, arg_value in vars(args).items():
-            if arg_name == 'hyperparams':
-                continue
-            params[arg_name] = arg_value
-        for arg_name, arg_value in args.other_args:
-            utils.update_param(params, arg_name, arg_value)
-        return params
-
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = gym.make(self.params['env_name'])
-        env = wrap.FixedDurationHack(env)
-        if isinstance(env.action_space, gym.spaces.Box):
-            env = wrap.DiscreteBox(env)
-        if self.params['random_actions']:
-            logging.info('making all duplicate actions random actions')
-            env = wrap.RandomActions(env, self.params['duplicate'])
-        else:
-            logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
-            env = wrap.DuplicateActions(env, self.params['duplicate'])
-        env = wrap.TorchInterface(env)
+        env = self.make_gym_env()
         test_env = copy.deepcopy(env)
         seeding.seed(self.params['seed'], gym, env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
@@ -106,12 +44,11 @@ class Trial:
 
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
-        
-        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
-        logging.info('training on device {}'.format(self.params['device']))
+
+        self.determine_device()
 
         if self.params['agent'] == 'random':
-            self.agent = RandomAgent(env.observation_space, env.action_space)
+	        self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
             self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
@@ -133,9 +70,6 @@ class Trial:
         os.makedirs(self.experiment_dir, exist_ok=True)
 
         utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
-
-    def teardown(self):
-        pass
 
     def update_agent(self):
         loss = []
@@ -255,7 +189,7 @@ class Trial:
 
 
 def main(test=False):
-    trial = Trial(test=test)
+    trial = TrainTrial(test=test)
     trial.run()
 
 

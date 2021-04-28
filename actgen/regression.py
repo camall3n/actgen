@@ -7,12 +7,12 @@ from tqdm import tqdm
 from . import utils
 from .agents import DQNAgent
 from .utils import Experience
-from .train import Trial
+from .train import TrainTrial
 
 logging.basicConfig(level=logging.INFO)
 
 
-class RegressionTrial(Trial):
+class RegressionTrial(TrainTrial):
     def __init__(self, test=True):
         super().__init__()
         args = self.parse_args()
