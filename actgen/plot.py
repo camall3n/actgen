@@ -128,24 +128,6 @@ def plot_batch_loss(data, env_name):
 	plt.show()
 
 
-def plot_all_learning_curves(results_dir, tag, param_tuned):
-	"""
-	plot all the learning curves for different hyperparams
-	"""
-	plt.figure()
-	for subdir in os.listdir(results_dir):
-		if subdir.startswith(tag + param_tuned):
-			absolute_dir = results_dir + subdir
-			rewards = preprocess_training_rewards(absolute_dir)
-			plt.plot(rewards[0], rewards[1], label=subdir)
-			plt.fill_between(rewards[0], rewards[1] - rewards[2], rewards[1] + rewards[2], alpha=.1)
-	plt.title('learninge curves for all {}'.format(tag + param_tuned))
-	plt.xlabel('training step')
-	plt.ylabel('reward')
-	plt.legend()
-	plt.show()
-
-
 def parse_args():
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('--results_dir', type=str, default='./results/',
