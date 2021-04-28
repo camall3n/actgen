@@ -1,160 +1,130 @@
 import os
-import csv
-import math
 import argparse
 import logging
 
 from matplotlib import pyplot as plt
-import numpy as np
+import pandas as pd
+import seaborn as sns
+
 
 logging.basicConfig(level=logging.INFO)
 
 
-def read_csv(fname):
-	"""
-	used to read in gscore csv & reward csv
-	"""
-	with open(fname, 'r') as f:
-		reader = csv.reader(f)
-		next(reader, None)  # skip over the header of csv
-		reader_results = [[float(i) for i in row] for row in list(reader)]
-		columns = list(zip(*reader_results))
-	return np.array(columns)
+def read_csv(fname, agent):
+    data = pd.read_csv(fname)
+    data['agent'] = agent
+    return data
 
 
-def preprocess_g_score(directory):
+def iterate_through_directory(directory, file_ending):
 	"""
-	go through the specified directory and compute the data needed for plotting
-	return time_step, avg_g_diff, confidence_interval
+	go through the specified the specified directory, and look for all the files
+	with a specific file_ending
+	return a list of file paths
 	"""
 	if not os.path.exists(directory):
 		logging.info("directory {} not found".format(directory))
-		return [], [], []
-	time_step = np.array([])
-	g_difference = np.array([])
+		return []
 	# iterate over the directory
+	all_file_paths = []
 	for file_name in os.listdir(directory):
-		# find all the saved gscore files
-		if file_name.endswith("training_gscore.csv"):
+		# find all eligible files
+		if file_name.endswith(file_ending):
 			file_path = os.path.join(directory, file_name)
-			step, plus_g, minus_g = read_csv(file_path)
-			if len(time_step) == 0:
-				time_step = step
-			assert time_step.all() == step.all()
-			g_difference = np.expand_dims(plus_g - minus_g, 0) if len(g_difference) == 0 else np.vstack([g_difference, plus_g - minus_g])
-	# average the g_difference and get 95% confidence interval
-	# each row of g_difference contains an example
-	if len(g_difference) == 0:
-		raise RuntimeWarning("no training gscore csv files found in the specified directory")
-	if len(g_difference.shape) == 1:
-		return time_step, g_difference, 0  # if only 1 example
-	avg_g_difference = np.mean(g_difference, axis=0)
-	ci = 1.96 * np.std(g_difference, axis=0) / math.sqrt(len(g_difference))
-	return time_step, avg_g_difference, ci
+			all_file_paths.append(file_path)
+	return all_file_paths
 
 
-def preprocess_training_rewards(directory):
+def preprocess_data(experiment_name, file_ending):
 	"""
-	go through the specified directory and compute the data needed for plotting
-	return time_step, rewards, confidence_interval
+	get all the csv data from a single gym environment experiment from all types of agents
+	return a pandas Dataframe object
 	"""
-	if not os.path.exists(directory):
-		logging.info("directory {} not found".format(directory))
-		return [], [], []
-	time_step = np.array([])
-	rewards = np.array([])
-		# iterate over the directory
-	for file_name in os.listdir(directory):
-		# find all the saved gscore files
-		if file_name.endswith("training_reward.csv"):
-			file_path = os.path.join(directory, file_name)
-			step, r = read_csv(file_path)
-			if len(time_step) == 0:
-				time_step = step
-			assert time_step.all() == step.all()
-			rewards = r if len(rewards) == 0 else np.vstack([rewards, r])
-	# average the g_difference and get 95% confidence interval
-	# each row of g_difference contains an example
-	if len(rewards) == 0:
-		raise RuntimeWarning("no training reward csv files found in the specified tag directory")
-	if len(rewards.shape) == 1:
-		return time_step, rewards, 0  # if only 1 example
-	avg_rewards = np.mean(rewards, axis=0)
-	ci = 1.96 * np.std(rewards, axis=0) / math.sqrt(len(rewards))
-	return time_step, avg_rewards, ci
+		# gather all files from agent
+	n_dup_agent = experiment_name
+	n_dup_files = iterate_through_directory(n_dup_agent, file_ending)
+
+	n_dup_oracle_agent = experiment_name + "-oracle"
+	n_dup_oracle_files = iterate_through_directory(n_dup_oracle_agent, file_ending)
+
+	no_dup_agent = experiment_name + "-nodup"
+	no_dup_files = iterate_through_directory(no_dup_agent, file_ending)
+
+	rand_actions_agent = experiment_name + "-rand"
+	rand_actions_files = iterate_through_directory(rand_actions_agent, file_ending)
+
+	rand_actions_oracle_agent = experiment_name + "-rand-oracle"
+	rand_actions_oracle_files = iterate_through_directory(rand_actions_oracle_agent, file_ending)
+
+	# gather all csv data from the files
+	fnames = n_dup_files + n_dup_oracle_files + no_dup_files + rand_actions_files + rand_actions_oracle_files
+	agents = ["N dup"] * len(n_dup_files) + \
+				["N dup with oracle"] * len(n_dup_oracle_files) + \
+				["no dup"] * len(no_dup_files) + \
+				["random actions"] * len(rand_actions_files) + \
+				["random actions with oracle"] * len(rand_actions_oracle_agent)
+	data = pd.concat([read_csv(fname, agent) for fname, agent in zip(fnames, agents)])
+
+	return data
 
 
-def preprocess_training_loss(directory):
+def gather_data_for_param_tuning(results_dir, tag, param_tuned):
 	"""
-	go through the specified directory, and get the training loss
-	return time_step, loss, confidence_interval
+	plot all the learning curves for different hyperparams
 	"""
-	if not os.path.exists(directory):
-		logging.info("directory {} not found".format(directory))
-		return [], [], []
-	time_step = np.array([])
-	loss = np.array([])
-		# iterate over the directory
-	for file_name in os.listdir(directory):
-		# find all the saved gscore files
-		if file_name.endswith("training_loss.csv"):
-			file_path = os.path.join(directory, file_name)
-			step, l = read_csv(file_path)
-			if len(time_step) == 0:
-				time_step = step
-			assert time_step.all() == step.all()
-			loss = l if len(loss) == 0 else np.vstack([loss, l])
-	# average the loss and get 95% confidence interval
-	# each row of loss contains an example
-	if len(loss) == 0:
-		logging.info("no training loss csv files found in the specified tag directory")
-	if len(loss.shape) == 1:
-		return time_step, loss, 0  # if only 1 example
-	avg_loss = np.mean(loss, axis=0)
-	ci = 1.96 * np.std(loss, axis=0) / math.sqrt(len(loss))
-	return time_step, avg_loss, ci
+	fnames = []
+	hyperparams = []
+	for subdir in os.listdir(results_dir):
+		if subdir.startswith(tag + '-' + param_tuned):
+			absolute_dir = results_dir + subdir
+			logging.info('found directory for tuning {}: {}'.format(param_tuned, absolute_dir))
+			files_in_dir = iterate_through_directory(absolute_dir, "training_reward.csv")
+			fnames += files_in_dir
+			hyperparams += [subdir] * len(files_in_dir)
+	data = pd.concat([read_csv(fname, hyperparam) for fname, hyperparam in zip(fnames, hyperparams)])
+	return data
 
-def plot_training_data(normal, oracle, no_duplicate, rand, rand_oracle, exp_name, data_type):
+
+def plot_g_score(data, env_name):
 	"""
-	plot the normal DQN and oracle DQN results on the same graph
-	used to plot training g-score or reward
+	plot the g-score results of all the agents from a single gym environment
 	"""
-	plt.figure()
-	plt.plot(normal[0], normal[1], label='N copy')
-	plt.fill_between(normal[0], normal[1] - normal[2], normal[1] + normal[2], alpha=.1)
-	# draw oracle only if one was provided
-	if len(oracle[0]) != 0:
-		plt.plot(oracle[0], oracle[1], label='N copy with oracle')
-		plt.fill_between(oracle[0], oracle[1] - oracle[2], oracle[1] + oracle[2], alpha=.1)
-	# draw original no duplication environment only if one was provided
-	if len(no_duplicate[0]) != 0:
-		plt.plot(no_duplicate[0], no_duplicate[1], label='regular')
-		plt.fill_between(no_duplicate[0], no_duplicate[1] - no_duplicate[2], no_duplicate[1] + no_duplicate[2], alpha=.1)
-	if len(rand[0]) != 0:
-		plt.plot(rand[0], rand[1], label='N copy with random actions')
-		plt.fill_between(rand[0], rand[1] - rand[2], rand[1] + rand[2], alpha=.1)
-	if len(rand_oracle[0]) != 0:
-		plt.plot(rand_oracle[0], rand_oracle[1], label='N copy with random actions with oracle')
-		plt.fill_between(rand_oracle[0], rand_oracle[1] - rand_oracle[2], rand_oracle[1] + rand_oracle[2], alpha=.1)
-	# plt.ylim((-1, 1))
-	plt.title('{} over time during training with {}'.format(data_type, exp_name))
-	plt.xlabel('training step')
-	plt.ylabel('{}'.format(data_type))
-	plt.legend()
+	data['g score'] = data['plus_g'].astype(float) - data['minus_g'].astype(float)
+	sns.set_theme()
+	sns.relplot(
+		data=data, kind="line",
+		x='training step', y='g score',
+		hue='agent', style='agent'
+	)
+	plt.title('g score of {}'.format(env_name))
 	plt.show()
 
 
-def plot_training_loss(time_step, loss, ci):
+def plot_reward(data, env_name):
 	"""
-	plot the loss over training process
+	plot the reward results of all the agent types from a single gym environment
 	"""
-	plt.figure()
-	plt.plot(time_step, loss, label='training loss')
-	plt.fill_between(time_step, loss-ci, loss+ci, alpha=.1)
-	plt.title('training loss')
-	plt.xlabel('training step')
-	plt.ylabel('loss')
-	plt.legend()
+	sns.set_theme()
+	sns.relplot(
+		data=data, kind="line",
+		x='training step', y='reward during evaluation callback',
+		hue='agent', style='agent'
+	)
+	plt.title('training curve of {}'.format(env_name))
+	plt.show()
+
+
+def plot_batch_loss(data, env_name):
+	"""
+	plot the training batch loss of all the agent types from a single gym environment
+	"""
+	sns.set_theme()
+	sns.relplot(
+		data=data, kind="line",
+		x='training step', y='batch loss',
+		hue='agent', style='agent'
+	)
+	plt.title('training loss of {}'.format(env_name))
 	plt.show()
 
 
@@ -184,6 +154,8 @@ def parse_args():
 						help='a subdirectory name for the saved results')
 	parser.add_argument('--tune_lr', default=False, action='store_true',
                             help='plot all training curves of different learning rate on one graph')
+	parser.add_argument('--plot_loss', default=False, action='store_true',
+                        	help='plot the training loss')
 	args = parser.parse_args()
 	return args
 
@@ -191,34 +163,26 @@ def parse_args():
 def main():
 	# parse arguments
 	args = parse_args()
-	directory = args.results_dir + args.tag
+	expriment_dir = args.results_dir + args.tag
 
 	# learning curve to tune learning rate
 	if args.tune_lr:
-		plot_all_learning_curves(args.results_dir, args.tag, param_tuned='-lr')
+		tune_data = gather_data_for_param_tuning(args.results_dir, args.tag, param_tuned='lr')
+		plot_reward(tune_data, args.tag)
 		return
 
-	# preprocess the g-score
-	normal_exp_gscore = preprocess_g_score(directory)
-	oracle_exp_gscore = preprocess_g_score(directory + "-oracle")
-	no_duplicate_exp_gscore = preprocess_g_score(directory + '-nodup')
-	rand_exp_gscore = preprocess_g_score(directory + "-rand")
-	rand_oracle_exp_gscore = preprocess_g_score(directory + "-rand-oracle")
-	
-	# preprocess the reward
-	normal_exp_reward = preprocess_training_rewards(directory)
-	oracle_exp_reward = preprocess_training_rewards(directory + "-oracle")
-	no_duplicate_exp_reward = preprocess_training_rewards(directory + "-nodup")
-	rand_exp_reward = preprocess_training_rewards(directory + "-rand")
-	rand_oracle_exp_reward = preprocess_training_rewards(directory + "-rand-oracle")
+	# plot reward
+	reward_data = preprocess_data(expriment_dir, "training_reward.csv")
+	plot_reward(reward_data, args.tag)
 
-	# preprocess the loss
-	exp_loss = preprocess_training_loss(directory)
+	# plot g score
+	g_score_data = preprocess_data(expriment_dir, "training_gscore.csv")
+	plot_g_score(g_score_data, args.tag)
 
-	# plot 
-	plot_training_data(normal_exp_gscore, oracle_exp_gscore, no_duplicate_exp_gscore, rand_exp_gscore, rand_oracle_exp_gscore, args.tag, "g difference")
-	plot_training_data(normal_exp_reward, oracle_exp_reward, no_duplicate_exp_reward, rand_exp_reward, rand_oracle_exp_reward, args.tag, "rewards")
-	plot_training_loss(*exp_loss)
+	# plot training loss
+	if args.plot_loss:
+		loss_data = preprocess_data(expriment_dir, "training_loss.csv")
+		plot_batch_loss(loss_data, args.tag)
 
 
 if __name__ == '__main__':
