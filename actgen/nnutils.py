@@ -107,11 +107,11 @@ class MLP(Network):
         layers = [
             Reshape(-1, n_inputs),
             torch.nn.Linear(n_inputs, n_units_per_layer),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             add_dropout_if_enabled(dropout)
         ] + [
             torch.nn.Linear(n_units_per_layer, n_units_per_layer),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             add_dropout_if_enabled(dropout)
         ] * (n_hidden_layers - 1) + [
             torch.nn.Linear(n_units_per_layer, n_outputs)
