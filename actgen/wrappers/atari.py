@@ -7,12 +7,14 @@ import gym
 import numpy as np
 from gym import Wrapper
 
+from .fixed_duration_hack import FixedDurationHack
+
 
 def get_box_shape_like(other_box, new_shape=None):
     """
         other_box: gym.spaces.Box
         new_shape: Optional[Tuple[int]]
-        Gets new spaces.Box like the one provided
+        Gets newgym.Box like the one provided
     """
     # the Box space in gym stores the low and high as the shape of the space,
     # (see: https://github.com/openai/gym/blob/master/gym/spaces/box.py#L43)
@@ -208,7 +210,7 @@ class FrameStack(gym.Wrapper):
         self.k = k
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
-        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[:-1] + (shp[-1] * k,)), dtype=env.observation_space.dtype)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(shp[:-1] + (shp[-1] * k,)), dtype=env.observation_space.dtype)
 
     def reset(self):
         ob = self.env.reset()
@@ -352,6 +354,7 @@ def wrap_deepmind(
 
 def make_deepmind_atari(
         env_name='MsPacman',
+        max_episode_steps=None,
         episode_life=False,
         clip_rewards=True,
         frame_stack=True,
@@ -363,6 +366,7 @@ def make_deepmind_atari(
     env = MaxAndSkipEnv(env, skip=4)
     if max_episode_steps is not None:
         env = TimeLimit(env, max_episode_steps=max_episode_steps)
+        env = FixedDurationHack(env)
     if episode_life:
         env = EpisodicLifeEnv(env)
     if 'FIRE' in env.unwrapped.get_action_meanings():

@@ -94,7 +94,7 @@ class Network(torch.nn.Module):
 
 
 class MLP(Network):
-    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer, 
+    def __init__(self, n_inputs, n_outputs, n_hidden_layers, n_units_per_layer,
                 dropout=False):
         super().__init__()
         self.n_inputs = n_inputs
@@ -103,7 +103,7 @@ class MLP(Network):
         assert n_hidden_layers >= 1
 
         add_dropout_if_enabled = torch.nn.Dropout if dropout else torch.nn.Identity
-        
+
         layers = [
             Reshape(-1, n_inputs),
             torch.nn.Linear(n_inputs, n_units_per_layer),
@@ -176,3 +176,10 @@ Example::
     idx = idx.view(*viewshape).expand_as(input)
     result = torch.gather(input, idx_dim, idx).mean(dim=idx_dim)
     return result
+
+def get_conv2d_output_size(size, kernel_size, stride):
+    ''' Adapted from pytorch tutorials:
+        https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
+    '''
+    return ((size[-2] - (kernel_size[-2] - 1) - 1) // stride + 1,
+            (size[-1] - (kernel_size[-1] - 1) - 1) // stride + 1)

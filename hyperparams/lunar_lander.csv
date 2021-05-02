@@ -1,3 +1,5 @@
+atari,False,bool
+architecture,mlp,str
 max_env_steps,300000,int
 eval_every_n_steps,5000,int
 gscore_every_n_steps,1000,int
