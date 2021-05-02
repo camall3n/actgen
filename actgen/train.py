@@ -38,8 +38,7 @@ class Trial:
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
         parser.add_argument('--env_name', type=str, default='CartPole-v0',
-                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2', 'MsPacman'],
-                            help='Which gym environment to use')
+                            help='Which gym environment to use (abbreviate Atari envs: e.g. "MsPacman")')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
@@ -98,6 +97,7 @@ class Trial:
                      frame_stack=self.params['frame_stack'],
                      scale=self.params['scale_pixel_values'])
         else:
+            assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
         if isinstance(env.action_space, gym.spaces.Box):
