@@ -3,9 +3,9 @@ import math
 import numpy as np
 import torch
 
-from ..nnutils import extract, MLP, one_hot
+from ..nnutils import extract, MLP, one_hot, Sequential
 from .replaymemory import ReplayMemory
-
+from .model import NatureDQN
 
 class DQNAgent():
     def __init__(self, observation_space, action_space, get_duplicate_actions_fn, params):
@@ -83,7 +83,7 @@ class DQNAgent():
             alpha = np.clip(alpha, 0, 1)
             epsilon = self.params['epsilon_final'] * alpha + 1 * (1 - alpha)
         return epsilon
-    
+
     def _get_action_similarities(self, batch):
         """
         return tensor of size (batch_size, n_actions) with values between 0 and 1.
@@ -127,8 +127,11 @@ class DQNAgent():
 
     def _make_qnet(self, n_features, n_actions, params):
         dropout = params['dropout_rate']
-        return MLP(n_inputs=n_features,
-                   n_outputs=n_actions,
-                   n_hidden_layers=params['n_hidden_layers'],
-                   n_units_per_layer=params['n_units_per_layer'],
-                   dropout=dropout).to(params['device'])
+        if params['arch'] == 'mlp':
+            return MLP(n_inputs=n_features,
+                       n_outputs=n_actions,
+                       n_hidden_layers=params['n_hidden_layers'],
+                       n_units_per_layer=params['n_units_per_layer'],
+                       dropout=dropout).to(params['device'])
+        elif params['arch'] == 'nature_dqn':
+            return NatureDQN(n_actions=n_actions).to(params['device'])
