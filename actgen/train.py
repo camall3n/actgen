@@ -38,8 +38,7 @@ class Trial:
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         # yapf: disable
         parser.add_argument('--env_name', type=str, default='CartPole-v0',
-                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2'],
-                            help='Which gym environment to use')
+                            help='Which gym environment to use (abbreviate Atari envs: e.g. "MsPacman")')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
@@ -87,8 +86,20 @@ class Trial:
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = gym.make(self.params['env_name'])
-        env = wrap.FixedDurationHack(env)
+        if self.params['atari']:
+            env = wrap.make_deepmind_atari(
+                     self.params['env_name'],
+                     max_episode_steps=(
+                        self.params['max_episode_steps'] if self.params['max_episode_steps'] > 0 else None
+                     ),
+                     episode_life=self.params['episode_life'],
+                     clip_rewards=self.params['clip_rewards'],
+                     frame_stack=self.params['frame_stack'],
+                     scale=self.params['scale_pixel_values'])
+        else:
+            assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
+            env = gym.make(self.params['env_name'])
+            env = wrap.FixedDurationHack(env)
         if isinstance(env.action_space, gym.spaces.Box):
             env = wrap.DiscreteBox(env)
         if self.params['random_actions']:
@@ -106,7 +117,7 @@ class Trial:
 
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
-        
+
         self.params['device'] = utils.determine_device(self.params['disable_gpu'])
         logging.info('training on device {}'.format(self.params['device']))
 
@@ -147,7 +158,11 @@ class Trial:
 
     def evaluate(self, step):
         ep_scores = []
-        for ep in range(self.params['n_eval_episodes']):
+        episode_range = range(self.params['n_eval_episodes'])
+        if self.params['atari']:
+            # evaluations take a while on atari, so add a progress bar
+            episode_range = tqdm(episode_range)
+        for ep in episode_range:
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
                 a = self.agent.act(s, testing=True).cpu()
@@ -217,7 +232,7 @@ class Trial:
             if step == 0:  # write header
                 csv_writer.writerow(['training step', 'plus_g', 'minus_g'])
             csv_writer.writerow([step, plus_g, minus_g])
-    
+
     def save_rewards(self, step, r):
         mode = 'w' if step == 0 else 'a'
         with open(self.experiment_dir + self.file_name + "_training_reward.csv", mode) as f:
@@ -225,7 +240,7 @@ class Trial:
             if step == 0:  # write header
                 csv_writer.writerow(['training step', 'reward during evaluation callback'])
             csv_writer.writerow([step, r])
-    
+
     def save_batch_loss(self, step, loss):
         mode = 'w' if step == 0 else 'a'
         with open(self.experiment_dir + self.file_name + "_training_loss.csv", mode) as f:
