@@ -106,6 +106,7 @@ class MLP(Network):
         
         layers = [
             Reshape(-1, n_inputs),
+            torch.nn.LayerNorm(n_inputs),
             torch.nn.Linear(n_inputs, n_units_per_layer),
             torch.nn.LeakyReLU(),
             add_dropout_if_enabled(dropout)
