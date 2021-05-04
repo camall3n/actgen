@@ -62,7 +62,7 @@ def preprocess_data(experiment_name, file_ending):
 				["N dup with oracle"] * len(n_dup_oracle_files) + \
 				["no dup"] * len(no_dup_files) + \
 				["random actions"] * len(rand_actions_files) + \
-				["random actions with oracle"] * len(rand_actions_oracle_agent)
+				["random actions with oracle"] * len(rand_actions_oracle_files)
 	data = pd.concat([read_csv(fname, agent) for fname, agent in zip(fnames, agents)])
 
 	return data
