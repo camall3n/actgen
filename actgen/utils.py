@@ -20,9 +20,11 @@ class Trial:
     def __init__(self):
         pass
 
-    def parse_args(self):
-        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        # yapf: disable
+    def parse_common_args(self):
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            add_help=False
+        )
         # common args
         parser.add_argument('--env_name', type=str, default='CartPole-v0',
                             help='Which gym environment to use (abbreviate Atari envs: e.g. "MsPacman")')
@@ -45,29 +47,15 @@ class Trial:
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
         parser.add_argument('--disable_gpu', default=False, action='store_true',
                             help='enforce training on CPU')
+        return parser
 
-        # train args
-        parser.add_argument('--regularization', type=str, default='None',
-                            choices=['None', 'l1', 'l2', 'dropout'],
-                            help='what regularization method to use during training')
-        parser.add_argument('--gscore', default=False, action='store_true',
-                            help='Calculate the g-score vs time as training proceeds')
-        parser.add_argument('--oracle', default=False, action='store_true',
-                            help='to perform oracle action generalization')
-
-        # manipulation args
-        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
-                            help='Path to a saved model that"s fully trained')
-        parser.add_argument('--out_file', type=str, default='change_q_metric.csv',
-                            help='Path to a output file to write to that will contain the computed metrics')
-
+    def parse_unknown_args(self, parser):
         args, unknown = parser.parse_known_args()
         other_args = {
             (remove_prefix(key, '--'), val)
             for (key, val) in zip(unknown[::2], unknown[1::2])
         }
         args.other_args = other_args
-        # yapf: enable
         return args
     
     def load_hyperparams(self, args):

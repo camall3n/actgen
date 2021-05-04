@@ -28,6 +28,14 @@ class EvalTrial(Trial):
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
+    
+    def parse_args(self):
+        eval_parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            parents=[self.parse_common_args()]
+        )
+        args = self.parse_unknown_args(eval_parser)
+        return args
 
     def setup(self):
         seeding.seed(0, random, torch, np)

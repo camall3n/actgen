@@ -1,3 +1,4 @@
+import argparse
 import copy
 import csv
 import logging
@@ -31,6 +32,22 @@ class TrainTrial(Trial):
             self.params['replay_warmup_steps'] = 50
             self.params['gscore'] = True
         self.setup()
+    
+    def parse_args(self):
+        train_parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            parents=[self.parse_common_args()]
+        )
+        # train args
+        train_parser.add_argument('--regularization', type=str, default='None',
+                            choices=['None', 'l1', 'l2', 'dropout'],
+                            help='what regularization method to use during training')
+        train_parser.add_argument('--gscore', default=False, action='store_true',
+                            help='Calculate the g-score vs time as training proceeds')
+        train_parser.add_argument('--oracle', default=False, action='store_true',
+                            help='to perform oracle action generalization')
+        args = self.parse_unknown_args(train_parser)
+        return args
 
     def setup(self):
         seeding.seed(0, random, torch, np)
@@ -47,7 +64,7 @@ class TrainTrial(Trial):
         self.determine_device()
 
         if self.params['agent'] == 'random':
-	        self.agent = RandomAgent(env.observation_space, env.action_space)
+            self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
             self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
