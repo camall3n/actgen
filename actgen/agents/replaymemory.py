@@ -22,8 +22,8 @@ class ReplayMemory:
 
     def sample(self, batch_size, itemize=False):
         samples = random.sample(self.memory, batch_size)
-        samples = list(zip(*samples))
-        batch = Experience(*samples)
+        arrays = list(zip(*samples))
+        batch = Experience(*arrays)
         return batch
 
     def __len__(self):
