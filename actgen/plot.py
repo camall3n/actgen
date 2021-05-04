@@ -138,6 +138,8 @@ def parse_args():
                             help='plot all training curves of different learning rate on one graph')
 	parser.add_argument('--plot_loss', default=False, action='store_true',
                         	help='plot the training loss')
+	parser.add_argument('--suppress_gscore', default=False, action='store_true',
+							help='do not plot gscore')
 	args = parser.parse_args()
 	return args
 
@@ -158,8 +160,9 @@ def main():
 	plot_reward(reward_data, args.tag)
 
 	# plot g score
-	g_score_data = preprocess_data(expriment_dir, "training_gscore.csv")
-	plot_g_score(g_score_data, args.tag)
+	if not args.suppress_gscore:
+		g_score_data = preprocess_data(expriment_dir, "training_gscore.csv")
+		plot_g_score(g_score_data, args.tag)
 
 	# plot training loss
 	if args.plot_loss:
