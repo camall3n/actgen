@@ -70,7 +70,8 @@ def preprocess_data(experiment_name, file_ending):
 
 def gather_data_for_param_tuning(results_dir, tag, param_tuned):
 	"""
-	plot all the learning curves for different hyperparams
+	gather all the data/directories needed for plotting the learning curves of 
+	different values of the hyperparam being tuned
 	"""
 	fnames = []
 	hyperparams = []
