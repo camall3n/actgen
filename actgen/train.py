@@ -1,4 +1,3 @@
-import argparse
 import copy
 import csv
 import logging
@@ -81,7 +80,11 @@ class TrainTrial(Trial):
 
     def evaluate(self, step):
         ep_scores = []
-        for ep in range(self.params['n_eval_episodes']):
+        episode_range = range(self.params['n_eval_episodes'])
+        if self.params['atari']:
+            # evaluations take a while on atari, so add a progress bar
+            episode_range = tqdm(episode_range)
+        for ep in episode_range:
             s, G, done, t = self.test_env.reset(), 0, False, 0
             while not done:
                 a = self.agent.act(s, testing=True).cpu()
@@ -151,7 +154,7 @@ class TrainTrial(Trial):
             if step == 0:  # write header
                 csv_writer.writerow(['training step', 'plus_g', 'minus_g'])
             csv_writer.writerow([step, plus_g, minus_g])
-    
+
     def save_rewards(self, step, r):
         mode = 'w' if step == 0 else 'a'
         with open(self.experiment_dir + self.file_name + "_training_reward.csv", mode) as f:
@@ -159,7 +162,7 @@ class TrainTrial(Trial):
             if step == 0:  # write header
                 csv_writer.writerow(['training step', 'reward during evaluation callback'])
             csv_writer.writerow([step, r])
-    
+
     def save_batch_loss(self, step, loss):
         mode = 'w' if step == 0 else 'a'
         with open(self.experiment_dir + self.file_name + "_training_loss.csv", mode) as f:

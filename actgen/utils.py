@@ -25,8 +25,7 @@ class Trial:
         # yapf: disable
         # common args
         parser.add_argument('--env_name', type=str, default='CartPole-v0',
-                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2'],
-                            help='Which gym environment to use')
+                            help='Which gym environment to use (abbreviate Atari envs: e.g. "MsPacman")')
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
@@ -82,8 +81,20 @@ class Trial:
         return params
     
     def make_gym_env(self):
-        env = gym.make(self.params['env_name'])
-        env = wrap.FixedDurationHack(env)
+        if self.params['atari']:
+            env = wrap.make_deepmind_atari(
+                    self.params['env_name'],
+                    max_episode_steps=(
+                    self.params['max_episode_steps'] if self.params['max_episode_steps'] > 0 else None
+                    ),
+                    episode_life=self.params['episode_life'],
+                    clip_rewards=self.params['clip_rewards'],
+                    frame_stack=self.params['frame_stack'],
+                    scale=self.params['scale_pixel_values'])
+        else:
+            assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
+            env = gym.make(self.params['env_name'])
+            env = wrap.FixedDurationHack(env)
         if isinstance(env.action_space, gym.spaces.Box):
             env = wrap.DiscreteBox(env)
         if self.params['random_actions']:
