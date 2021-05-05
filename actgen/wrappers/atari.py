@@ -10,7 +10,7 @@ from gym import Wrapper
 from .fixed_duration_hack import FixedDurationHack
 
 
-def get_box_shape_like(other_box, new_shape=None):
+def get_box_shape_like(other_box, new_shape=None, dtype=None):
     """
         other_box: gym.spaces.Box
         new_shape: Optional[Tuple[int]]
@@ -23,12 +23,15 @@ def get_box_shape_like(other_box, new_shape=None):
     if new_shape is None:
         new_shape = other_box.shape
 
+    if dtype is None:
+        dtype = other_box.dtype
+
     low = np.unique(other_box.low)
     high = np.unique(other_box.high)
     assert len(low) == 1
     assert len(high) == 1
 
-    return gym.spaces.Box(low=low[0], high=high[0], shape=new_shape, dtype=other_box.dtype)
+    return gym.spaces.Box(low=low[0], high=high[0], shape=new_shape, dtype=dtype)
 
 
 # From https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/common/wrappers.py
@@ -210,7 +213,7 @@ class FrameStack(gym.Wrapper):
         self.k = k
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(shp[:-1] + (shp[-1] * k,)), dtype=env.observation_space.dtype)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=((shp[0] * k, ) + shp[1:]), dtype=env.observation_space.dtype)
 
     def reset(self):
         ob = self.env.reset()
@@ -273,6 +276,7 @@ class WarpFrame(ModifyImageWrapper):
 class ScaledFloatFrame(ModifyImageWrapper):
     def __init__(self, env):
         super().__init__(env, self._scale)
+        self.observation_space = get_box_shape_like(env.observation_space, dtype=np.float32)
 
     def _scale(self, frame):
         # careful! This undoes the memory optimization, use
@@ -281,7 +285,7 @@ class ScaledFloatFrame(ModifyImageWrapper):
 
 
 class PyTorchFrame(ModifyImageWrapper):
-    """Image shape to num_channels x height x width"""
+    """Image shape from (height x width x channels) to (C x H x W)"""
     def __init__(self, env):
         super().__init__(env, self._to_pytorch_format)
         shape = env.observation_space.shape
@@ -312,46 +316,6 @@ class LazyFrames:
         return self._frames[i]
 
 
-def wrap_deepmind(
-        env_name='MsPacman',
-        max_episode_steps=None,
-        episode_life=False,
-        clip_rewards=False,
-        frame_skip=4,
-        frame_stack=4,
-        frame_warp=(84, 84),
-        **kwargs):
-    """
-    Wraps a skills Montezuma Env in the wrappers to emulate the deepmind style wrappers seen in:
-    https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py#L275
-    """
-    # Structure looks like:
-    # Wrappers --> SteveEnv -> MonteSkillsEnv => AtariSkillsEnv -> NoopWrapper --> BaseEnv (Gym)
-    # Where the double arrow (=>) is subclassing, the longer arrows (-->) are true wrappers, and
-    # the while the others (->) are attributes (self.env)
-
-    # NOTE: NOOP is done in the internal env in gym_montezuma/montezuma_env.py
-    env = gym.make('{}NoFrameskip-v4'.format(env_name))
-    if noop_wrapper:
-        env = NoopResetEnv(env, noop_max=30)
-    env = WarpFrame(env, frame_warp)
-    env = PyTorchFrame(env)
-
-    if max_episode_steps is not None:
-        env = TimeLimit(env, max_episode_steps=max_episode_steps)
-    if episode_life:
-        env = EpisodicLifeEnv(env)
-
-    if 'FIRE' in env.unwrapped.get_action_meanings():
-        env = FireResetEnv(env)
-
-    if clip_rewards:
-        env = ClipRewardEnv(env)
-
-    env = FrameSkipStackPool(env, skip=frame_skip, stack=frame_stack)
-    return env
-
-
 def make_deepmind_atari(
         env_name='MsPacman',
         max_episode_steps=None,
@@ -372,10 +336,11 @@ def make_deepmind_atari(
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
     env = WarpFrame(env)
-    if scale:
-        env = ScaledFloatFrame(env)
+    env = PyTorchFrame(env)
     if clip_rewards:
         env = ClipRewardEnv(env)
     if frame_stack:
         env = FrameStack(env, 4)
+    if scale:
+        env = ScaledFloatFrame(env)
     return env
