@@ -58,6 +58,7 @@ class TrainTrial(Trial):
         self.env = env
         self.test_env = test_env
 
+        self.check_params_validity(self.params)
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
 

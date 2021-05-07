@@ -33,6 +33,8 @@ class Trial:
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--action_effect_multiplier', '-e', type=float, default=1,
+                            help='the action effect multiplier (use none-one values to enable semi-duplicate actions)')
         parser.add_argument('--random_actions', default=False, action='store_true',
                             help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
@@ -48,6 +50,11 @@ class Trial:
         parser.add_argument('--disable_gpu', default=False, action='store_true',
                             help='enforce training on CPU')
         return parser
+    
+    def check_params_validity(self, params):
+        assert 0 <= params['action_effect_multiplier'] <= 1, "action_effect_multiplier must be a float between [0, 1]"
+        logging.info('action_effect_multiplier is {}'.format(params['action_effect_multiplier']))
+        assert params['duplicate'] >= 1, "number of sets fo duplicate actions can't be less than 1"
 
     def parse_unknown_args(self, parser):
         args, unknown = parser.parse_known_args()
@@ -84,7 +91,7 @@ class Trial:
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
         if isinstance(env.action_space, gym.spaces.Box):
-            env = wrap.DiscreteBox(env)
+            env = wrap.DiscreteBox(env, self.params['action_effect_multiplier'])
         if self.params['random_actions']:
             logging.info('making all duplicate actions random actions')
             env = wrap.RandomActions(env, self.params['duplicate'])

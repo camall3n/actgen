@@ -46,6 +46,7 @@ class ManipulationTrial(Trial):
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
          
+        self.check_params_validity(self.params)
         self.determine_device()
 
         if self.params['agent'] == 'dqn':

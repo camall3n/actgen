@@ -4,8 +4,12 @@ import numpy as np
 class DiscreteBox(gym.Wrapper):
     """
     Discretize a continuous "Box" action space into a discrete action space
+    action_effect_multiplier:
+        must be a float in [0, 1], that adjusts the effect of the action
+        1 --> maintans the effect of the action
+        0 --> nullifies the effect of the action
     """
-    def __init__(self, env):
+    def __init__(self, env, action_effect_multiplier=1):
         """
         :param env: an unwrapped gym environment that has a Box action space of shape (n,)
         """
@@ -13,8 +17,8 @@ class DiscreteBox(gym.Wrapper):
         self.shape = env.action_space.shape
         assert len(self.shape) == 1
         self.n_dims = self.shape[0]
-        self.high = env.action_space.high
-        self.low = env.action_space.low
+        self.high = env.action_space.high * action_effect_multiplier
+        self.low = env.action_space.low * action_effect_multiplier
         self.mid = (self.low + self.high)/2
         value_lists = [
             [self.low[i], self.mid[i], self.high[i]] for i in range(self.n_dims)
