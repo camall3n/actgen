@@ -87,17 +87,16 @@ class Trial:
                     frame_stack=self.params['frame_stack'],
                     scale=self.params['scale_pixel_values'])
         else:
-            assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
-        if isinstance(env.action_space, gym.spaces.Box):
-            env = wrap.DiscreteBox(env, self.params['action_effect_multiplier'])
         if self.params['random_actions']:
             logging.info('making all duplicate actions random actions')
             env = wrap.RandomActions(env, self.params['duplicate'])
         else:
             logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
-            env = wrap.DuplicateActions(env, self.params['duplicate'])
+            env = wrap.DuplicateActions(env, self.params['duplicate'], self.params['action_effect_multiplier'])
+        if isinstance(env.action_space, gym.spaces.Box):
+            env = wrap.DiscreteBox(env)
         env = wrap.TorchInterface(env)
         return env
     
