@@ -1,5 +1,9 @@
+import math
+
 import gym
 import numpy as np
+
+from .. import utils
 
 class DiscreteBox(gym.Wrapper):
     """
@@ -32,6 +36,9 @@ class DiscreteBox(gym.Wrapper):
             raise RuntimeError("trying to take action not in action space")
         original_a = self.actions[action]  # the corresponding original action of the original env
         return self.env.step(original_a)
+    
+    def get_action_similarity_scores(self, a):
+        return utils.get_action_similarity_for_discrete_action_space(a, self.n_dup, self.action_space.n, self.similarity_score)
 
 
 def test_discrete_box():

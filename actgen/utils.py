@@ -3,6 +3,7 @@ import csv
 from distutils.util import strtobool
 import logging
 from pydoc import locate
+import math
 
 import gym
 import argparse
@@ -163,3 +164,28 @@ def determine_device(disable_gpu):
     else:
         torch.backends.cudnn.benchmark = True
         return torch.device('cuda')
+
+def get_action_similarity_for_discrete_action_space(a, n_dup, n_total_actions, similarity_score):
+    """
+    return a list of similarity scores of 'a' with all the actions in the action_space
+    a: action being taken
+    n_dup: number of sets of duplicated actions
+    n_total_actions: number of total discrete actions in action space
+    similarity_score: similarity score of the duplicated actions
+    """
+    original_env_a = math.floor(a / n_dup)
+    # whether 'a' corresponds the an action in the original env, or a duplicated action
+    is_original_env_action = a % n_dup == 0
+    # most actions aren't similar at all
+    similarity_scores = [0] * n_total_actions
+    # if 'a' is an original action
+    if is_original_env_action:
+        similarity_scores[a] = 1
+        for i in range(original_env_a*n_dup+1, (original_env_a+1)*n_dup):
+            similarity_scores[i] = similarity_score
+    # if 'a' in a duplicated action
+    else:
+        similarity_scores[original_env_a * n_dup] = similarity_score
+        for i in range(original_env_a*n_dup+1, (original_env_a+1)*n_dup):
+            similarity_scores[i] = 1
+    return similarity_scores

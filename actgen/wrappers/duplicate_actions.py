@@ -3,6 +3,8 @@ import numpy as np
 
 import math
 
+from .. import utils
+
 
 class DuplicateActions(gym.Wrapper):
     """
@@ -20,6 +22,7 @@ class DuplicateActions(gym.Wrapper):
         """
         super(DuplicateActions, self).__init__(env)
         self.n_dup = n_dup
+        self.similarity_score = similarity_score
         # create new action space
         if type(env.action_space) == gym.spaces.Discrete:
             # catch illegal semi-duplicate actions
@@ -45,7 +48,7 @@ class DuplicateActions(gym.Wrapper):
             # create new Box
             self.action_space = gym.spaces.Box(new_low, new_high, dtype=env.action_space.dtype)
         else:
-            raise NotImplementedError('duplicate actions only implemented for Discrete and 1D Box action spaces')
+            raise NotImplementedError('duplicate actions only implemented for Discrete and Box action spaces')
 
     def step(self, action):
         """
@@ -61,13 +64,16 @@ class DuplicateActions(gym.Wrapper):
         elif type(self.action_space) == gym.spaces.Box:
             return self.env.step(action)
     
-    def get_duplicate_actions(self, a):
+    def get_action_similarity_scores(self, a):
         """
-        return all the actions that's a duplicate 'a' in a list
+        return a list of similarity scores of 'a' with all the actions in the action_space
         """
-        original_env_a = math.floor(a / self.n_dup)
-        all_duplicate_actions = list(range(original_env_a * self.n_dup, original_env_a * self.n_dup + self.n_dup))
-        return all_duplicate_actions
+        if type(self.action_space) == gym.spaces.Discrete:
+            return utils.get_action_similarity_for_discrete_action_space(a, self.n_dup, self.action_space.n, self.similarity_score)
+        elif type(self.action_space) == gym.spaces.Box:
+            raise RuntimeError('Box action space should be wrapped in discrete_box wrapper to get action similarity')
+        else:
+            raise NotImplementedError('duplicate actions only implemented for Discrete and Box action spaces')
 
 
 def test_duplicate_action_env():
@@ -94,3 +100,5 @@ def test_duplicate_action_env():
 
 if __name__ == '__main__':
     test_duplicate_action_env()
+
+# %%
