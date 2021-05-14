@@ -32,9 +32,9 @@ class EvalTrial(Trial):
     def parse_args(self):
         eval_parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            parents=[self.parse_common_args()]
+            parents=[self.get_common_arg_parser()]
         )
-        args = self.parse_unknown_args(eval_parser)
+        args = self.parse_common_args(eval_parser)
         return args
 
     def setup(self):

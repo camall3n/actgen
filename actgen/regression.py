@@ -45,7 +45,7 @@ class RegressionTrial(TrainTrial):
                             help='Enable test mode for quickly checking configuration works')
         parser.add_argument('--load', type=str, default='results/cartpole_seed0_dup5_best.pytorch',
                             help='Path to the saved model file')
-        args = self.parse_unknown_args(parser)
+        args = self.parse_common_args(parser)
         # yapf: enable
         return args
 

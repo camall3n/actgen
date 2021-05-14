@@ -30,14 +30,14 @@ class ManipulationTrial(Trial):
     def parse_args(self):
         manipulation_parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            parents=[self.parse_common_args()]
+            parents=[self.get_common_arg_parser()]
         )
         # manipulation args
         manipulation_parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
-                            help='Path to a saved model that"s fully trained')
+                            help="Path to a saved model that's fully trained")
         manipulation_parser.add_argument('--out_file', type=str, default='change_q_metric.csv',
                             help='Path to a output file to write to that will contain the computed metrics')
-        args = self.parse_unknown_args(manipulation_parser)
+        args = self.parse_common_args(manipulation_parser)
         return args
 
     def setup(self):

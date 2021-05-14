@@ -36,7 +36,7 @@ class TrainTrial(Trial):
     def parse_args(self):
         train_parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            parents=[self.parse_common_args()]
+            parents=[self.get_common_arg_parser()]
         )
         # train args
         train_parser.add_argument('--regularization', type=str, default='None',
@@ -46,7 +46,7 @@ class TrainTrial(Trial):
                             help='Calculate the g-score vs time as training proceeds')
         train_parser.add_argument('--oracle', default=False, action='store_true',
                             help='to perform oracle action generalization')
-        args = self.parse_unknown_args(train_parser)
+        args = self.parse_common_args(train_parser)
         return args
 
     def setup(self):
