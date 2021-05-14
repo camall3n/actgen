@@ -10,9 +10,8 @@ import seaborn as sns
 logging.basicConfig(level=logging.INFO)
 
 
-def read_csv(fname, agent):
+def read_csv(fname):
     data = pd.read_csv(fname)
-    data['agent'] = agent
     return data
 
 
@@ -40,32 +39,25 @@ def preprocess_data(experiment_name, file_ending):
 	get all the csv data from a single gym environment experiment from all types of agents
 	return a pandas Dataframe object
 	"""
-		# gather all files from agent
-	n_dup_agent = experiment_name
-	n_dup_files = iterate_through_directory(n_dup_agent, file_ending)
+	# all data that needs to be plotted
+	dirname_to_description = {
+		experiment_name: "5 dup",
+		experiment_name + "-oracle": "5 dup with oracle",
+		experiment_name + "-nodup": "no dup",
+		experiment_name + "-rand": "random actions",
+		experiment_name + '-rand-oracle': "random actions with oracle",
+	}
+	# gather all the files for each directory
+	accumulated_data = []
+	for dirname in dirname_to_description:
+		description = dirname_to_description[dirname]
+		all_files = iterate_through_directory(dirname, file_ending)
+		data_in_dir = pd.concat([read_csv(fname) for fname in all_files])
+		data_in_dir['agent'] = description
+		accumulated_data.append(data_in_dir)
+	accumulated_data = pd.concat(accumulated_data)
 
-	n_dup_oracle_agent = experiment_name + "-oracle"
-	n_dup_oracle_files = iterate_through_directory(n_dup_oracle_agent, file_ending)
-
-	no_dup_agent = experiment_name + "-nodup"
-	no_dup_files = iterate_through_directory(no_dup_agent, file_ending)
-
-	rand_actions_agent = experiment_name + "-rand"
-	rand_actions_files = iterate_through_directory(rand_actions_agent, file_ending)
-
-	rand_actions_oracle_agent = experiment_name + "-rand-oracle"
-	rand_actions_oracle_files = iterate_through_directory(rand_actions_oracle_agent, file_ending)
-
-	# gather all csv data from the files
-	fnames = n_dup_files + n_dup_oracle_files + no_dup_files + rand_actions_files + rand_actions_oracle_files
-	agents = ["N dup"] * len(n_dup_files) + \
-				["N dup with oracle"] * len(n_dup_oracle_files) + \
-				["no dup"] * len(no_dup_files) + \
-				["random actions"] * len(rand_actions_files) + \
-				["random actions with oracle"] * len(rand_actions_oracle_files)
-	data = pd.concat([read_csv(fname, agent) for fname, agent in zip(fnames, agents)])
-
-	return data
+	return accumulated_data
 
 
 def gather_data_for_param_tuning(results_dir, tag, param_tuned):
