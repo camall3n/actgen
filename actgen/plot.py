@@ -67,17 +67,18 @@ def gather_data_for_param_tuning(results_dir, tag, param_tuned):
 	gather all the data/directories needed for plotting the learning curves of 
 	different values of the hyperparam being tuned
 	"""
-	fnames = []
-	hyperparams = []
+	accumulated_data = []
 	for subdir in os.listdir(results_dir):
 		if subdir.startswith(tag + '-' + param_tuned):
+			data_in_subdir = []
 			absolute_dir = results_dir + subdir
 			logging.info('found directory for tuning {}: {}'.format(param_tuned, absolute_dir))
 			files_in_dir = iterate_through_directory(absolute_dir, "training_reward.csv")
-			fnames += files_in_dir
-			hyperparams += [subdir] * len(files_in_dir)
-	data = pd.concat([read_csv(fname, hyperparam) for fname, hyperparam in zip(fnames, hyperparams)])
-	return data
+			data_in_subdir = pd.concat([read_csv(fname) for fname in files_in_dir])
+			data_in_subdir['agent'] = subdir
+			accumulated_data.append(data_in_subdir)
+	accumulated_data = pd.concat(accumulated_data)
+	return accumulated_data
 
 
 def plot_g_score(data, env_name):
