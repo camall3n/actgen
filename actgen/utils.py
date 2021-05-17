@@ -178,6 +178,10 @@ def get_action_similarity_for_discrete_action_space(a, n_dup, n_total_actions, s
     is_original_env_action = a % n_dup == 0
     # most actions aren't similar at all
     similarity_scores = [0] * n_total_actions
+    # in case that duplicate action is the same as the original action
+    # currently only the middle-action (no-op) is the same as original action
+    if original_env_a % 2 == 1:
+        similarity_score = 1
     # if 'a' is an original action
     if is_original_env_action:
         similarity_scores[a] = 1
