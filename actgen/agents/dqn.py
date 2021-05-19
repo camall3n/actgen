@@ -81,9 +81,8 @@ class DQNAgent():
         if testing:
             epsilon = self.params['epsilon_during_eval']
         else:
-            alpha = (len(self.replay) - self.params['replay_warmup_steps']) / self.params['epsilon_decay_period']
-            alpha = np.clip(alpha, 0, 1)
-            epsilon = self.params['epsilon_final'] * alpha + 1 * (1 - alpha)
+            epsilon = (self.params['epsilon_final'] + (1 - self.params['epsilon_final']) 
+                 * math.exp(-1. * self.n_training_steps / self.params['epsilon_decay_period']))
         return epsilon
 
     def _get_action_similarities(self, batch):
