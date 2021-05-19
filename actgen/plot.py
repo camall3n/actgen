@@ -10,11 +10,6 @@ import seaborn as sns
 logging.basicConfig(level=logging.INFO)
 
 
-def read_csv(fname):
-    data = pd.read_csv(fname)
-    return data
-
-
 def iterate_through_directory(directory, file_ending):
 	"""
 	go through the specified the specified directory, and look for all the files
@@ -54,7 +49,7 @@ def preprocess_data(experiment_name, file_ending):
 		all_files = iterate_through_directory(dirname, file_ending)
 		if not all_files:
 			continue  # for non-existent directories
-		data_in_dir = pd.concat([read_csv(fname) for fname in all_files])
+		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files])
 		data_in_dir['agent'] = description
 		accumulated_data.append(data_in_dir)
 	accumulated_data = pd.concat(accumulated_data)
@@ -74,7 +69,7 @@ def gather_data_for_param_tuning(results_dir, tag, param_tuned):
 			absolute_dir = results_dir + subdir
 			logging.info('found directory for tuning {}: {}'.format(param_tuned, absolute_dir))
 			files_in_dir = iterate_through_directory(absolute_dir, "training_reward.csv")
-			data_in_subdir = pd.concat([read_csv(fname) for fname in files_in_dir])
+			data_in_subdir = pd.concat([pd.read_csv(fname) for fname in files_in_dir])
 			data_in_subdir['agent'] = subdir
 			accumulated_data.append(data_in_subdir)
 	accumulated_data = pd.concat(accumulated_data)
