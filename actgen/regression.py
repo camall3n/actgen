@@ -7,12 +7,12 @@ from tqdm import tqdm
 from . import utils
 from .agents import DQNAgent
 from .utils import Experience
-from .train import Trial
+from .train import TrainTrial
 
 logging.basicConfig(level=logging.INFO)
 
 
-class RegressionTrial(Trial):
+class RegressionTrial(TrainTrial):
     def __init__(self, test=True):
         super().__init__()
         args = self.parse_args()
@@ -45,12 +45,7 @@ class RegressionTrial(Trial):
                             help='Enable test mode for quickly checking configuration works')
         parser.add_argument('--load', type=str, default='results/cartpole_seed0_dup5_best.pytorch',
                             help='Path to the saved model file')
-        args, unknown = parser.parse_known_args()
-        other_args = {
-            (utils.remove_prefix(key, '--'), val)
-            for (key, val) in zip(unknown[::2], unknown[1::2])
-        }
-        args.other_args = other_args
+        args = self.parse_common_args(parser)
         # yapf: enable
         return args
 

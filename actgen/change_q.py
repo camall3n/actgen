@@ -11,15 +11,14 @@ import seeding
 import torch
 from tqdm import tqdm
 
-from . import utils
-from . import wrappers as wrap
+from .utils import Trial
 from .agents import DQNAgent, DirectedQNet, ActionDQNAgent
 from .gscore import plot_confusion_matrix, calc_g_score, build_confusion_matrix
 
 logging.basicConfig(level=logging.INFO)
 
 
-class ManipulationTrial:
+class ManipulationTrial(Trial):
     def __init__(self, test=True):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
@@ -27,71 +26,33 @@ class ManipulationTrial:
         if self.params['test'] or test:
             self.params['test'] = True
         self.setup()
-
+    
     def parse_args(self):
-        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        # yapf: disable
-        parser.add_argument('--env_name', type=str, default='CartPole-v0',
-                            choices=['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2'],
-                            help='Which gym environment to use')
-        parser.add_argument('--agent', type=str, default='dqn',
-                            choices=['dqn', 'random', 'action_dqn'],
-                            help='Which agent to use')
-        parser.add_argument('--duplicate', '-d', type=int, default=5,
-                            help='Number of times to duplicate actions')
-        parser.add_argument('--seed', '-s', type=int, default=0,
-                            help='Random seed')
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/defaults.csv',
-                            help='Path to hyperparameters csv file')
-        parser.add_argument('--test', default=False, action='store_true',
-                            help='Enable test mode for quickly checking configuration works')
-        parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
-                            help='Path to a saved model that"s fully trained')
-        parser.add_argument('--out_file', type=str, default='change_q_metric.csv',
+        manipulation_parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            parents=[self.get_common_arg_parser()]
+        )
+        # manipulation args
+        manipulation_parser.add_argument('--load', type=str, default='results/default_exp/dqn_seed0_none_best.pytorch',
+                            help="Path to a saved model that's fully trained")
+        manipulation_parser.add_argument('--out_file', type=str, default='change_q_metric.csv',
                             help='Path to a output file to write to that will contain the computed metrics')
-        parser.add_argument('--results_dir', type=str, default='./results/',
-                            help='Path to the result directory to save model files')
-        parser.add_argument('--tag', type=str, default='default_exp',
-                            help='A tag for the current experiment, used as a subdirectory name for saving models')
-        parser.add_argument('--disable_gpu', default=False, action='store_true',
-                            help='enforce training on CPU')
-        args, unknown = parser.parse_known_args()
-        other_args = {
-            (utils.remove_prefix(key, '--'), val)
-            for (key, val) in zip(unknown[::2], unknown[1::2])
-        }
-        args.other_args = other_args
-        # yapf: enable
+        args = self.parse_common_args(manipulation_parser)
         return args
-
-    def load_hyperparams(self, args):
-        params = utils.load_hyperparams(args.hyperparams)
-        for arg_name, arg_value in vars(args).items():
-            if arg_name == 'hyperparams':
-                continue
-            params[arg_name] = arg_value
-        for arg_name, arg_value in args.other_args:
-            utils.update_param(params, arg_name, arg_value)
-        return params
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        test_env = gym.make(self.params['env_name'])
-        test_env = wrap.FixedDurationHack(test_env)
-        if isinstance(test_env.action_space, gym.spaces.Box):
-            test_env = wrap.DiscreteBox(test_env)
-        test_env = wrap.DuplicateActions(test_env, self.params['duplicate'])
-        test_env = wrap.TorchInterface(test_env)
+        test_env = self.make_gym_env()
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
          
-        self.params['device'] = utils.determine_device(self.params['disable_gpu'])
-        logging.info('change_q on device {}'.format(self.params['device']))
+        self.determine_device()
 
         if self.params['agent'] == 'dqn':
             self.agent = DQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
             self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
+
         # load saved model
         if not self.params['test']:
             print("loading model from ", self.params['load'])
@@ -99,9 +60,6 @@ class ManipulationTrial:
 
         self.experiment_dir = self.params['results_dir'] + self.params['tag'] + '/'
         os.makedirs(self.experiment_dir, exist_ok=True)
-
-    def teardown(self):
-        pass
 
     def run(self):
         # number of actions
