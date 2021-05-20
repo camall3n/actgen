@@ -10,12 +10,6 @@ import seaborn as sns
 logging.basicConfig(level=logging.INFO)
 
 
-def read_csv(fname, agent):
-    data = pd.read_csv(fname)
-    data['agent'] = agent
-    return data
-
-
 def iterate_through_directory(directory, file_ending):
 	"""
 	go through the specified the specified directory, and look for all the files
@@ -35,37 +29,28 @@ def iterate_through_directory(directory, file_ending):
 	return all_file_paths
 
 
-def preprocess_data(experiment_name, file_ending):
+def preprocess_data(file_ending, dirname_to_description):
 	"""
 	get all the csv data from a single gym environment experiment from all types of agents
 	return a pandas Dataframe object
+	args:
+		file_ending: the ending format of the file whose data needs to be gathered (e.g. loss.csv)
+		dirname_to_descirption: a dictionary mapping the directory name (data that needs to be plotted)
+								to the plot's description of that directory of data
 	"""
-		# gather all files from agent
-	n_dup_agent = experiment_name
-	n_dup_files = iterate_through_directory(n_dup_agent, file_ending)
+	# gather all the files for each directory
+	accumulated_data = []
+	for dirname in dirname_to_description:
+		description = dirname_to_description[dirname]
+		all_files = iterate_through_directory(dirname, file_ending)
+		if not all_files:
+			continue  # for non-existent directories
+		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files])
+		data_in_dir['agent'] = description
+		accumulated_data.append(data_in_dir)
+	accumulated_data = pd.concat(accumulated_data)
 
-	n_dup_oracle_agent = experiment_name + "-oracle"
-	n_dup_oracle_files = iterate_through_directory(n_dup_oracle_agent, file_ending)
-
-	no_dup_agent = experiment_name + "-nodup"
-	no_dup_files = iterate_through_directory(no_dup_agent, file_ending)
-
-	rand_actions_agent = experiment_name + "-rand"
-	rand_actions_files = iterate_through_directory(rand_actions_agent, file_ending)
-
-	rand_actions_oracle_agent = experiment_name + "-rand-oracle"
-	rand_actions_oracle_files = iterate_through_directory(rand_actions_oracle_agent, file_ending)
-
-	# gather all csv data from the files
-	fnames = n_dup_files + n_dup_oracle_files + no_dup_files + rand_actions_files + rand_actions_oracle_files
-	agents = ["N dup"] * len(n_dup_files) + \
-				["N dup with oracle"] * len(n_dup_oracle_files) + \
-				["no dup"] * len(no_dup_files) + \
-				["random actions"] * len(rand_actions_files) + \
-				["random actions with oracle"] * len(rand_actions_oracle_files)
-	data = pd.concat([read_csv(fname, agent) for fname, agent in zip(fnames, agents)])
-
-	return data
+	return accumulated_data
 
 
 def gather_data_for_param_tuning(results_dir, tag, param_tuned):
@@ -73,17 +58,18 @@ def gather_data_for_param_tuning(results_dir, tag, param_tuned):
 	gather all the data/directories needed for plotting the learning curves of 
 	different values of the hyperparam being tuned
 	"""
-	fnames = []
-	hyperparams = []
+	accumulated_data = []
 	for subdir in os.listdir(results_dir):
 		if subdir.startswith(tag + '-' + param_tuned):
+			data_in_subdir = []
 			absolute_dir = results_dir + subdir
 			logging.info('found directory for tuning {}: {}'.format(param_tuned, absolute_dir))
 			files_in_dir = iterate_through_directory(absolute_dir, "training_reward.csv")
-			fnames += files_in_dir
-			hyperparams += [subdir] * len(files_in_dir)
-	data = pd.concat([read_csv(fname, hyperparam) for fname, hyperparam in zip(fnames, hyperparams)])
-	return data
+			data_in_subdir = pd.concat([pd.read_csv(fname) for fname in files_in_dir])
+			data_in_subdir['agent'] = subdir
+			accumulated_data.append(data_in_subdir)
+	accumulated_data = pd.concat(accumulated_data)
+	return accumulated_data
 
 
 def plot_g_score(data, env_name):
@@ -137,6 +123,10 @@ def parse_args():
 						help='a subdirectory name for the saved results')
 	parser.add_argument('--tune_lr', default=False, action='store_true',
                             help='plot all training curves of different learning rate on one graph')
+	parser.add_argument('--plot_ndup', default=False, action='store_true',
+							help='plot the training curve of all N-dup experiments for different values of N')
+	parser.add_argument('--plot_semi', default=False, action='store_true',
+							help='plot the training curve of all k-semi-dup experiments for different values of k')
 	parser.add_argument('--plot_loss', default=False, action='store_true',
                         	help='plot the training loss')
 	parser.add_argument('--suppress_gscore', default=False, action='store_true',
@@ -148,26 +138,48 @@ def parse_args():
 def main():
 	# parse arguments
 	args = parse_args()
-	expriment_dir = args.results_dir + args.tag
+	experiment_dir = args.results_dir + args.tag
 
 	# learning curve to tune learning rate
 	if args.tune_lr:
 		tune_data = gather_data_for_param_tuning(args.results_dir, args.tag, param_tuned='lr')
 		plot_reward(tune_data, args.tag)
 		return
+	
+	# all data that needs to be plotted
+	# base cases needed by all
+	dirname_to_description = {
+		experiment_dir + "-nodup": "no dup",
+		experiment_dir: "5 dup",
+		experiment_dir + "-oracle": "5 dup with oracle",
+	}
+	if args.plot_ndup:
+		all_values_of_n = [15, 50]
+		for n in all_values_of_n:
+			dirname_to_description[experiment_dir + "-{}dup".format(n)] = "{} dup".format(n)
+			dirname_to_description[experiment_dir + "-{}dup-oracle".format(n)] = "{} dup with oracle".format(n)
+	elif args.plot_semi:
+		all_semi_scores = [0.2, 0.5, 0.8, 0.95, 0.99]
+		for k in all_semi_scores:
+			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "{} semi-duplicate".format(k)
+			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "{} semi-duplicate with oracle".format(k)
+	else:
+		# default option
+		dirname_to_description[experiment_dir + "-rand"] = "random actions"
+		dirname_to_description[experiment_dir + "-rand-oracle"] = "random actions with oracle"
 
 	# plot reward
-	reward_data = preprocess_data(expriment_dir, "training_reward.csv")
+	reward_data = preprocess_data("training_reward.csv", dirname_to_description)
 	plot_reward(reward_data, args.tag)
 
 	# plot g score
 	if not args.suppress_gscore:
-		g_score_data = preprocess_data(expriment_dir, "training_gscore.csv")
+		g_score_data = preprocess_data("training_gscore.csv", dirname_to_description)
 		plot_g_score(g_score_data, args.tag)
 
 	# plot training loss
 	if args.plot_loss:
-		loss_data = preprocess_data(expriment_dir, "training_loss.csv")
+		loss_data = preprocess_data("training_loss.csv", dirname_to_description)
 		plot_batch_loss(loss_data, args.tag)
 
 

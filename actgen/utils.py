@@ -21,7 +21,7 @@ class Trial:
     def __init__(self):
         pass
 
-    def parse_common_args(self):
+    def get_common_arg_parser(self):
         parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             add_help=False
@@ -57,7 +57,7 @@ class Trial:
         logging.info('action_effect_multiplier is {}'.format(params['action_effect_multiplier']))
         assert params['duplicate'] >= 1, "number of sets fo duplicate actions can't be less than 1"
 
-    def parse_unknown_args(self, parser):
+    def parse_common_args(self, parser):
         args, unknown = parser.parse_known_args()
         other_args = {
             (remove_prefix(key, '--'), val)
@@ -102,7 +102,12 @@ class Trial:
         return env
     
     def determine_device(self):
-        self.params['device'] = determine_device(self.params['disable_gpu'])
+        if self.params['disable_gpu'] or not torch.cuda.is_available():
+	        device = torch.device('cpu')
+        else:
+            torch.backends.cudnn.benchmark = True
+            device = torch.device('cuda')
+        self.params['device'] = device
         logging.info('training on device {}'.format(self.params['device']))
 
     def teardown(self):
@@ -157,13 +162,6 @@ def every_n_times(n, count, callback, *args, final_count=None):
     if (count % n == 0) or (final_count is not None and (count == final_count)):
         callback(*args)
 
-
-def determine_device(disable_gpu):
-    if disable_gpu or not torch.cuda.is_available():
-        return torch.device('cpu')
-    else:
-        torch.backends.cudnn.benchmark = True
-        return torch.device('cuda')
 
 def get_action_similarity_for_discrete_action_space(a, n_dup, n_total_actions, similarity_score):
     """
