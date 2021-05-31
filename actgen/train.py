@@ -7,6 +7,7 @@ import random
 
 import gym
 import numpy as np
+import pandas as pd
 import seeding
 import torch
 from tqdm import tqdm
@@ -31,7 +32,18 @@ class TrainTrial(Trial):
             self.params['n_eval_episodes'] = 2
             self.params['replay_warmup_steps'] = 50
             self.params['gscore'] = True
+        if self.params['resume_training_dir']:
+            resume_dir = self.params['results_dir'] + self.params['resume_training_dir']
+            if not os.path.exists(resume_dir):
+                raise RuntimeError('specified resuming directory {} does not exist'.format(resume_dir))
+            logging.info('resuming training from directory {}'.format(resume_dir))
+            old_hyperparam_file = os.path.join(resume_dir, 'dqn_seed{}_none_hyperparams.csv'.format(self.params['seed']))
+            utils.load_hyperparams(old_hyperparam_file)
+        # common set up
         self.setup()
+        # set up for resuming training
+        if self.params['resume_training_dir']:
+	        self.resume_train_setup(resume_dir)
     
     def parse_args(self):
         train_parser = argparse.ArgumentParser(
@@ -46,6 +58,8 @@ class TrainTrial(Trial):
                             help='Calculate the g-score vs time as training proceeds')
         train_parser.add_argument('--oracle', default=False, action='store_true',
                             help='to perform oracle action generalization')
+        train_parser.add_argument('--resume_training_dir', type=str, default='',
+                            help='the relative directory from which to pick up training, from where it was left off')
         args = self.parse_common_args(train_parser)
         return args
 
@@ -58,6 +72,9 @@ class TrainTrial(Trial):
         self.env = env
         self.test_env = test_env
 
+        self.starting_step = 0
+        self.best_score = -np.inf
+
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
 
@@ -69,7 +86,6 @@ class TrainTrial(Trial):
             self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
             self.agent = ActionDQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
-        self.best_score = -np.inf
 
         if self.params['regularization'] == 'l1':
             regularizer = self.params['regularization'] + "_" + str(self.params['regularization_weight_l1'])
@@ -83,9 +99,31 @@ class TrainTrial(Trial):
                     + 'seed' + str(self.params['seed']) + '_' \
                     + regularizer
         self.experiment_dir = self.params['results_dir'] + self.params['tag'] + '/'
-        os.makedirs(self.experiment_dir, exist_ok=True)
 
-        utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
+        if not self.params['resume_training_dir']:
+            os.makedirs(self.experiment_dir, exist_ok=True)
+            utils.save_hyperparams(self.experiment_dir+self.file_name+'_hyperparams.csv', self.params)
+    
+    def resume_train_setup(self, resume_dir):
+        """
+        this function assumes there's only 1 experiment (1 seed) that was ran in resume_dir
+        """
+        # figure out which step currently on - depends on loss.csv
+        old_loss_file = os.path.join(resume_dir, 'dqn_seed{}_none_training_loss.csv'.format(self.params['seed']))
+        old_losses = pd.read_csv(old_loss_file)
+        last_run_stopping_step = int(old_losses.iloc[-1]['training step'])
+        logging.info('resuming from step {}'.format(last_run_stopping_step))
+        self.starting_step = last_run_stopping_step
+
+        # set best score - for purpose of saving best agent
+        old_reward_file = os.path.join(resume_dir, 'dqn_seed{}_none_training_reward.csv'.format(self.params['seed']))
+        old_rewards = pd.read_csv(old_reward_file)['reward during evaluation callback']
+        self.best_score = old_rewards.max()
+
+        # load agent from saved files
+        saved_model_file = os.path.join(resume_dir, 'dqn_seed{}_none_latest.pytorch'.format(self.params['seed']))
+        self.agent.q.load(saved_model_file)
+        self.agent.q_target.load(saved_model_file)
 
     def update_agent(self):
         loss = []
@@ -190,7 +228,7 @@ class TrainTrial(Trial):
 
     def run(self):
         s, done, t = self.env.reset(), False, 0
-        for step in tqdm(range(self.params['max_env_steps'])):
+        for step in tqdm(range(self.starting_step, self.params['max_env_steps'])):
             a = self.agent.act(s).cpu()
             sp, r, done, _ = self.env.step(a)
             t = t + 1
