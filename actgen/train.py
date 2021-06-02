@@ -33,12 +33,14 @@ class TrainTrial(Trial):
             self.params['replay_warmup_steps'] = 50
             self.params['gscore'] = True
         if self.params['resume_training_dir']:
-            resume_dir = self.params['results_dir'] + self.params['resume_training_dir']
+            resume_tag = self.params['resume_training_dir']
+            resume_dir = self.params['results_dir'] + resume_tag
             if not os.path.exists(resume_dir):
                 raise RuntimeError('specified resuming directory {} does not exist'.format(resume_dir))
             logging.info('resuming training from directory {}'.format(resume_dir))
             old_hyperparam_file = os.path.join(resume_dir, 'dqn_seed{}_none_hyperparams.csv'.format(self.params['seed']))
             self.params = utils.load_hyperparams(old_hyperparam_file)
+            self.params['resume_training_dir'] = resume_tag  # copy over this param because it's not in the old params
         # common set up
         self.setup()
         # set up for resuming training
