@@ -325,7 +325,11 @@ def make_deepmind_atari(
         scale=False):
     """Configure environment for DeepMind-style Atari.
     """
-    env = gym.make('{}NoFrameskip-v4'.format(env_name))
+    import gym_minipacman
+    if 'MiniPacman' in env_name:
+        env = gym.make('{}NoFrameskip-v0'.format(env_name))  # hack to be compatible with minipacman naming
+    else:
+        env = gym.make('{}NoFrameskip-v4'.format(env_name))
     env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
     if max_episode_steps is not None:
