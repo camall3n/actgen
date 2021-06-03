@@ -10,10 +10,11 @@ import numpy as np
 import pandas as pd
 import seeding
 import torch
+import pfrl
 from tqdm import tqdm
 
 from . import utils
-from .agents import RandomAgent, DQNAgent, DirectedQNet, ActionDQNAgent
+from .agents import RandomAgent, DQNAgent, DirectedQNet, ActionDQNAgent, PfrlDQNAgent
 from .utils import Experience, Trial
 from .gscore import calc_g_score, build_confusion_matrix
 
@@ -67,8 +68,12 @@ class TrainTrial(Trial):
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = self.make_gym_env()
-        test_env = copy.deepcopy(env)
+        if self.params['pfrl']:
+            env = self.make_gym_env(test=False)
+            test_env = self.make_gym_env(test=True)
+        else:
+            env = self.make_gym_env()
+            test_env = copy.deepcopy(env)
         seeding.seed(self.params['seed'], gym, env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
@@ -85,7 +90,12 @@ class TrainTrial(Trial):
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
+            if self.params['pfrl']:
+                # random seeds for pfrl
+                pfrl.utils.set_random_seed(self.params['seed'])
+                self.agent = PfrlDQNAgent(env.observation_space, env.action_space, self.params)
+            else:
+                self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
         elif self.params['agent'] == 'action_dqn':
             self.agent = ActionDQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
 
@@ -229,23 +239,37 @@ class TrainTrial(Trial):
             csv_writer.writerow([step, loss])
 
     def run(self):
-        s, done, t = self.env.reset(), False, 0
-        for step in tqdm(range(self.starting_step, self.params['max_env_steps'])):
-            a = self.agent.act(s).cpu()
-            sp, r, done, _ = self.env.step(a)
-            t = t + 1
-            terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done
-            self.agent.store(Experience(s, a, r, sp, terminal))
-            loss = self.update_agent()
-            if done:
-                s = self.env.reset()
-            else:
-                s = sp
-            utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
-            utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
-            if self.params['gscore']:
-                utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
-        self.teardown()
+        if self.params['pfrl']:
+            pfrl.experiments.train_agent_batch_with_evaluation(
+                agent=self.agent,
+                env=self.env,
+                eval_env=self.test_env,
+                steps=self.params['max_env_steps'],
+                eval_n_steps=None,
+                eval_n_episodes=self.params['n_eval_episodes'],
+                eval_interval=self.params['eval_every_n_steps'],
+                outdir=self.experiment_dir,
+                save_best_so_far_agent=False,
+                log_interval=self.params['eval_every_n_steps'],
+            )
+        else:
+            s, done, t = self.env.reset(), False, 0
+            for step in tqdm(range(self.starting_step, self.params['max_env_steps'])):
+                a = self.agent.act(s).cpu()
+                sp, r, done, _ = self.env.step(a)
+                t = t + 1
+                terminal = torch.as_tensor(False) if t == self.env.unwrapped._max_episode_steps else done
+                self.agent.store(Experience(s, a, r, sp, terminal))
+                loss = self.update_agent()
+                if done:
+                    s = self.env.reset()
+                else:
+                    s = sp
+                utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
+                utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
+                if self.params['gscore']:
+                    utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
+            self.teardown()
 
 
 def main(test=False):

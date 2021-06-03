@@ -1,6 +1,16 @@
 import torch
+from pfrl.initializers.chainer_default import init_chainer_default
+from pfrl import nn as pnn
+from pfrl.q_functions import DiscreteActionValueHead
 
 from . import nnutils
+
+def make_pfrl_nature_dqn(n_actions=18):
+    return torch.nn.Sequential(
+        pnn.LargeAtariCNN(),
+        init_chainer_default(torch.nn.Linear(512, n_actions)),
+        DiscreteActionValueHead(),
+    )
 
 class NatureDQN(nnutils.Network):
     def __init__(self, input_shape=(4, 84, 84), n_actions=18):

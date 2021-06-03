@@ -11,6 +11,8 @@ gscore_every_n_steps,250000,int
 save_loss_every_n_steps,1000,int
 n_eval_episodes,5,int
 n_gscore_states,100,int
+pfrl,True,bool
+num_vectorized_envs,4,int
 updates_per_env_step,1,int
 learning_rate,0.00003,float
 epsilon_during_eval,0.02,float

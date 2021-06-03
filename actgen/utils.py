@@ -3,10 +3,14 @@ import csv
 from distutils.util import strtobool
 import logging
 from pydoc import locate
+import functools
 
 import gym
 import argparse
 import torch
+import numpy as np
+import pfrl
+from pfrl.wrappers import atari_wrappers
 
 from . import wrappers as wrap
 
@@ -68,17 +72,53 @@ class Trial:
             update_param(params, arg_name, arg_value)
         return params
     
-    def make_gym_env(self):
+    def make_gym_env(self, test=False):
         if self.params['atari']:
-            env = wrap.make_deepmind_atari(
-                    self.params['env_name'],
-                    max_episode_steps=(
-                    self.params['max_episode_steps'] if self.params['max_episode_steps'] > 0 else None
-                    ),
-                    episode_life=self.params['episode_life'],
-                    clip_rewards=self.params['clip_rewards'],
-                    frame_stack=self.params['frame_stack'],
-                    scale=self.params['scale_pixel_values'])
+            if self.params['pfrl']:
+                # source: https://github.com/pfnet/pfrl/blob/master/examples/atari/train_dqn_batch_ale.py
+                process_seeds = np.arange(self.params['num_vectorized_envs']) + self.params['seed'] * self.params['num_vectorized_envs']
+                assert process_seeds.max() < 2 ** 32
+
+                def make_pfrl_env(idx, test):
+                    # use different random seeds for train and test envs
+                    process_seed = int(process_seeds[idx])
+                    env_seed = 2 ** 32 - 1 - process_seed if test else process_seed
+                    env_name = '{}NoFrameskip-v4'.format(self.params['env_name'])
+                    env = atari_wrappers.wrap_deepmind(
+                        atari_wrappers.make_atari(env_name, max_frames=30*60*60),
+                        episode_life=self.params['episode_life'],
+                        clip_rewards=self.params['clip_rewards'],
+                        frame_stack=self.params['frame_stack'],
+                        scale=self.params['scale_pixel_values']
+                    )
+                    if test:
+	                    # Randomize actions like epsilon-greedy in evaluation as well
+                        env = pfrl.wrappers.RandomizeAction(env, self.params['epsilon_during_eval'])
+                    env.seed(env_seed)
+                    return env
+
+                def make_pfrl_batch_env(test):
+                    vec_env = pfrl.envs.MultiprocessVectorEnv(
+                        [
+                            functools.partial(make_pfrl_env, idx, test) 
+                            for idx, env in enumerate(range(self.params['num_vectorized_envs']))
+                        ]
+                    )
+                    vec_env = pfrl.wrappers.VectorFrameStack(vec_env, 4)
+                    return vec_env
+
+                env = make_pfrl_batch_env(test)
+                return env  # don't need more custom wrappers
+            else:
+                env = wrap.make_deepmind_atari(
+                        self.params['env_name'],
+                        max_episode_steps=(
+                        self.params['max_episode_steps'] if self.params['max_episode_steps'] > 0 else None
+                        ),
+                        episode_life=self.params['episode_life'],
+                        clip_rewards=self.params['clip_rewards'],
+                        frame_stack=self.params['frame_stack'],
+                        scale=self.params['scale_pixel_values'])
         else:
             assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
