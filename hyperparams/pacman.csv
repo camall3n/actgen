@@ -8,7 +8,7 @@ max_env_steps,200000000,int
 max_episode_steps,4500,int
 eval_every_n_steps,200000,int
 gscore_every_n_steps,250000,int
-save_loss_every_n_steps,1000,int
+save_loss_every_n_steps,-1,int
 n_eval_episodes,5,int
 n_gscore_states,100,int
 updates_per_env_step,1,int
