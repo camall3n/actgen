@@ -1,5 +1,4 @@
 import argparse
-import copy
 import csv
 import logging
 import os
@@ -51,8 +50,8 @@ class TrainTrial(Trial):
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = self.make_gym_env()
-        test_env = copy.deepcopy(env)
+        env = self.make_gym_env(test=False)
+        test_env = self.make_gym_env(test=True)
         seeding.seed(self.params['seed'], gym, env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
@@ -202,7 +201,8 @@ class TrainTrial(Trial):
             else:
                 s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
-            utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
+            if self.params['save_loss_every_n_steps'] > 0:
+                utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
         self.teardown()
