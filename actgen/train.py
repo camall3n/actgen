@@ -1,5 +1,4 @@
 import argparse
-import copy
 import csv
 import logging
 import os
@@ -51,8 +50,8 @@ class TrainTrial(Trial):
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = self.make_gym_env()
-        test_env = copy.deepcopy(env)
+        env = self.make_gym_env(test=False)
+        test_env = self.make_gym_env(test=True)
         seeding.seed(self.params['seed'], gym, env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env

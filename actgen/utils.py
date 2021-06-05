@@ -68,15 +68,15 @@ class Trial:
             update_param(params, arg_name, arg_value)
         return params
     
-    def make_gym_env(self):
+    def make_gym_env(self, test=False):
         if self.params['atari']:
             env = wrap.make_deepmind_atari(
                     self.params['env_name'],
                     max_episode_steps=(
                     self.params['max_episode_steps'] if self.params['max_episode_steps'] > 0 else None
                     ),
-                    episode_life=self.params['episode_life'],
-                    clip_rewards=self.params['clip_rewards'],
+                    episode_life=(self.params['episode_life'] and not test),
+                    clip_rewards=(self.params['clip_rewards'] and not test),
                     frame_stack=self.params['frame_stack'],
                     scale=self.params['scale_pixel_values'])
         else:
