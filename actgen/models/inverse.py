@@ -15,19 +15,19 @@ class InverseModel(torch.nn.Module):
         super(InverseModel, self).__init__()
         self.discrete = discrete
         self.body = torch.nn.Sequential(
-            torch.nn.Linear(params['latent_dim'] * 2, params['layer_size']),
+            torch.nn.Linear(params['latent_dim'] * 2, params['inv_layer_size']),
             torch.nn.ReLU(),
-            torch.nn.Linear(params['layer_size'], params['layer_size']),
+            torch.nn.Linear(params['inv_layer_size'], params['inv_layer_size']),
             torch.nn.ReLU(),
         )
         if self.discrete:
-            self.log_pr_linear = torch.nn.Linear(params['layer_size'], n_actions)
+            self.log_pr_linear = torch.nn.Linear(params['inv_layer_size'], n_actions)
             self.cross_entropy = torch.nn.CrossEntropyLoss()
         else:
-            self.mean_linear = torch.nn.Linear(params['layer_size'], n_actions)
-            self.log_std_linear = torch.nn.Linear(params['layer_size'], n_actions)
-            self.log_sig_min = params['log_std_min']
-            self.log_sig_max = params['log_std_max']
+            self.mean_linear = torch.nn.Linear(params['inv_layer_size'], n_actions)
+            self.log_std_linear = torch.nn.Linear(params['inv_layer_size'], n_actions)
+            self.log_sig_min = params['inv_log_std_min']
+            self.log_sig_max = params['inv_log_std_max']
 
     def forward(self, z0, z1):
         """
