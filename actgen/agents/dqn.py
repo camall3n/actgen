@@ -3,7 +3,7 @@ import math
 import numpy as np
 import torch
 
-from ..nnutils import extract, MLP, one_hot, Sequential
+from ..nnutils import extract, MLP, one_hot
 from .replaymemory import ReplayMemory
 from ..models import NatureDQN
 
