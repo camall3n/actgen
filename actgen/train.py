@@ -45,6 +45,8 @@ class TrainTrial(Trial):
                             help='Calculate the g-score vs time as training proceeds')
         train_parser.add_argument('--oracle', default=False, action='store_true',
                             help='to perform oracle action generalization')
+        train_parser.add_argument('--inv_model', default=False, action='store_true',
+                            help='use the inverse model to guide Q-updates')
         args = self.parse_common_args(train_parser)
         return args
 
@@ -59,6 +61,9 @@ class TrainTrial(Trial):
 
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
+        
+        if self.params['oracle'] and self.params['atari']:
+            raise RuntimeError("atari domains don't have an exact oracle")
 
         self.determine_device()
 

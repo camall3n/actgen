@@ -1,6 +1,8 @@
 import torch
 
-class InverseModel(torch.nn.Module):
+from .. import nnutils
+
+class InverseModel(nnutils.Network):
     """
     Description:
         Predicts the action distribution given a (state, next_state) pair.
@@ -60,10 +62,10 @@ class InverseModel(torch.nn.Module):
         otherwise they should have dtype torch.float32.
         """
         if self.discrete:
-            log_pr_actions = self.inverse_model(z0, z1)
+            log_pr_actions = self.forward(z0, z1)
             l_inverse = self.cross_entropy(input=log_pr_actions, target=a)
         else:
-            mean, std = self.inverse_model(z0, z1)
+            mean, std = self.forward(z0, z1)
             cov = torch.diag_embed(std, dim1=1, dim2=2)
             normal = torch.distributions.MultivariateNormal(loc=mean, covariance_matrix=cov)
             log_pr_action = normal.log_prob(a)

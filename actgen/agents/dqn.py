@@ -6,6 +6,7 @@ import torch
 from ..nnutils import extract, MLP, one_hot
 from .replaymemory import ReplayMemory
 from ..models import NatureDQN
+from .inverse_predictor import InversePredictor
 
 class DQNAgent():
     def __init__(self, observation_space, action_space, get_duplicate_actions_fn, params):
@@ -28,8 +29,13 @@ class DQNAgent():
         params = list(self.q.parameters())
         self.optimizer = torch.optim.Adam(params, lr=self.params['learning_rate'])
 
+        if self.params['inv_model']:
+            self.inverse_predictor = InversePredictor(action_space.n, self.params, discrete=True)
+
     def save(self, fname, dir, is_best):
         self.q.save(fname, dir, is_best)
+        if self.params['inv_model']:
+            self.inverse_predictor.save(fname, dir, is_best)
 
     def act(self, x, testing=False):
         if ((len(self.replay) < self.params['replay_warmup_steps']
@@ -74,6 +80,10 @@ class DQNAgent():
             # hard copy
             if self.n_training_steps % self.params['target_copy_period'] == 0:
                 self.q_target.hard_copy_from(self.q)
+        
+        # update inverse model
+        if self.params['inv_model']:
+            self.inverse_predictor.update(batch, encoder=self.q.encoder)
 
         return loss.detach().item()
 
@@ -98,6 +108,12 @@ class DQNAgent():
             for i, acted in enumerate(action_taken):
                 all_duplicate_actions = self.get_duplicate_actions_fn(acted)
                 similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
+        elif self.params['inv_model']:
+            states = torch.stack(batch.state).float().to(self.params['device'])
+            next_states = torch.stack(batch.next_state).float().to(self.params['device'])
+            action_probs = self.inverse_predictor.predict(states, next_states, encoder=self.q.encoder)  # (batch_size, n_actions)
+            clipped_action_probs = torch.clip(action_probs, min=self.params['inv_clip_threshold'])  # (batch_size, n_actions)
+            similarity_mat = clipped_action_probs
         return similarity_mat
 
     def _get_q_targets(self, batch):

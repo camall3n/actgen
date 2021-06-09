@@ -33,3 +33,5 @@ pin_other_q_values,True,bool
 dqn_train_pin_other_q_values,True,bool
 latent_dim,3136,int
 inv_layer_size,512,int
+inv_learning_rate,0.00003,float
+inv_clip_threshold,0.1,float
