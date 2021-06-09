@@ -5,7 +5,7 @@ import torch
 
 from ..nnutils import extract, MLP, one_hot, Sequential
 from .replaymemory import ReplayMemory
-from ..model import NatureDQN
+from ..models.dqn import NatureDQN
 
 class DQNAgent():
     def __init__(self, observation_space, action_space, get_duplicate_actions_fn, params):
@@ -81,7 +81,7 @@ class DQNAgent():
         if testing:
             epsilon = self.params['epsilon_during_eval']
         else:
-            epsilon = (self.params['epsilon_final'] + (1 - self.params['epsilon_final']) 
+            epsilon = (self.params['epsilon_final'] + (1 - self.params['epsilon_final'])
                  * math.exp(-1. * self.n_training_steps / self.params['epsilon_decay_period']))
         return epsilon
 
