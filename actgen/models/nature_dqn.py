@@ -1,6 +1,6 @@
 import torch
 
-from . import nnutils
+from .. import nnutils
 
 class NatureDQN(nnutils.Network):
     def __init__(self, input_shape=(4, 84, 84), n_actions=18):

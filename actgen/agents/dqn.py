@@ -5,7 +5,7 @@ import torch
 
 from ..nnutils import extract, MLP, one_hot, Sequential
 from .replaymemory import ReplayMemory
-from ..models.dqn import NatureDQN
+from ..models import NatureDQN
 
 class DQNAgent():
     def __init__(self, observation_space, action_space, get_duplicate_actions_fn, params):
