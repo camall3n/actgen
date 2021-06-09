@@ -4,7 +4,7 @@ episode_life,True,bool
 clip_rewards,True,bool
 frame_stack,True,bool
 scale_pixel_values,True,bool
-max_env_steps,200000000,int
+max_env_steps,10000000,int
 max_episode_steps,4500,int
 eval_every_n_steps,200000,int
 gscore_every_n_steps,250000,int
