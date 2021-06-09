@@ -31,3 +31,5 @@ change_percentage_thresh,0.10,float
 gscore_optimizer,sgd,str
 pin_other_q_values,True,bool
 dqn_train_pin_other_q_values,True,bool
+latent_dim,3136,int
+inv_layer_size,512,int
