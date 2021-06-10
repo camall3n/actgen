@@ -45,6 +45,8 @@ class Trial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
+        parser.add_argument('--inv_model', default=False, action='store_true',
+                            help='use the inverse model to guide Q-updates')
         parser.add_argument('--disable_gpu', default=False, action='store_true',
                             help='enforce training on CPU')
         return parser

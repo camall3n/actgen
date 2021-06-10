@@ -45,8 +45,6 @@ class TrainTrial(Trial):
                             help='Calculate the g-score vs time as training proceeds')
         train_parser.add_argument('--oracle', default=False, action='store_true',
                             help='to perform oracle action generalization')
-        train_parser.add_argument('--inv_model', default=False, action='store_true',
-                            help='use the inverse model to guide Q-updates')
         args = self.parse_common_args(train_parser)
         return args
 
