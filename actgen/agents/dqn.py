@@ -109,9 +109,7 @@ class DQNAgent():
                 all_duplicate_actions = self.get_duplicate_actions_fn(acted)
                 similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
         elif self.params['inv_model']:
-            states = torch.stack(batch.state).float().to(self.params['device'])
-            next_states = torch.stack(batch.next_state).float().to(self.params['device'])
-            action_probs = self.inverse_predictor.predict(states, next_states, encoder=self.q.encoder)  # (batch_size, n_actions)
+            action_probs = self.inverse_predictor.predict(batch, encoder=self.q.encoder)  # (batch_size, n_actions)
             clipped_action_probs = torch.clip(action_probs, min=self.params['inv_clip_threshold'])  # (batch_size, n_actions)
             similarity_mat = clipped_action_probs
         return similarity_mat

@@ -17,7 +17,9 @@ class InversePredictor():
 	def save(self, name, model_dir, is_best):
 		self.inv_model.save(name, model_dir, is_best)
 
-	def predict(self, s, sp, encoder):
+	def predict(self, batch, encoder):
+		s = torch.stack(batch.state).float().to(self.params['device'])
+		sp = torch.stack(batch.next_state).float().to(self.params['device'])
 		# inverse model takes in embeddings, not states
 		z = encoder(s)
 		zp = encoder(sp)
@@ -27,9 +29,9 @@ class InversePredictor():
 		self.inv_model.train()
 		self.optimizer.zero_grad()
 
-		s = torch.stack(batch.state)
-		a = torch.stack(batch.action)
-		sp = torch.stack(batch.next_state)
+		s = torch.stack(batch.state).to(self.params['device'])
+		a = torch.stack(batch.action).to(self.params['device'])
+		sp = torch.stack(batch.next_state).to(self.params['device'])
 
 		# detach the gradients of the encodings so that the encoder weights aren't affected
 		z = encoder(s).detach()
