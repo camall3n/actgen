@@ -35,7 +35,7 @@ class Trial:
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
         parser.add_argument('--action_effect_multiplier', '-e', type=float, default=1,
-                            help='the action effect multiplier (use none-one values to enable semi-duplicate actions)')
+                            help='Multiplier in range [0,1] to create semi-duplicate actions from base actions.')
         parser.add_argument('--random_actions', default=False, action='store_true',
                             help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
