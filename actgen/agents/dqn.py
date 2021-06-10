@@ -30,7 +30,7 @@ class DQNAgent():
         self.optimizer = torch.optim.Adam(params, lr=self.params['learning_rate'])
 
         if self.params['inv_model']:
-            self.inverse_predictor = InversePredictor(action_space.n, self.params, discrete=True).to(params['device'])
+            self.inverse_predictor = InversePredictor(action_space.n, self.params, discrete=True)
 
     def save(self, fname, dir, is_best):
         self.q.save(fname, dir, is_best)

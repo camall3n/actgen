@@ -8,7 +8,7 @@ class InversePredictor():
 	(in the sense that they lead to similar states after action execution)
 	"""
 	def __init__(self, n_actions, params, discrete=True):
-		self.inv_model = InverseModel(n_actions, params, discrete)
+		self.inv_model = InverseModel(n_actions, params, discrete).to(params['device'])
 		self.params = params
 
 		optim_params = list(self.inv_model.parameters())
