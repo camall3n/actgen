@@ -88,6 +88,7 @@ class Trial:
                     frame_stack=self.params['frame_stack'],
                     scale=self.params['scale_pixel_values'])
         else:
+            assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
         if self.params['random_actions']:
