@@ -58,6 +58,7 @@ class TrainTrial(Trial):
         self.env = env
         self.test_env = test_env
 
+        self.check_params_validity(self.params)
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
 
@@ -66,9 +67,9 @@ class TrainTrial(Trial):
         if self.params['agent'] == 'random':
             self.agent = RandomAgent(env.observation_space, env.action_space)
         elif self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
+            self.agent = DQNAgent(env.observation_space, env.action_space, env.get_action_similarity_scores, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(env.observation_space, env.action_space, env.get_duplicate_actions, self.params)
+            self.agent = ActionDQNAgent(env.observation_space, env.action_space, env.get_action_similarity_scores, self.params)
         self.best_score = -np.inf
 
         if self.params['regularization'] == 'l1':

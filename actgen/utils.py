@@ -3,6 +3,7 @@ import csv
 from distutils.util import strtobool
 import logging
 from pydoc import locate
+import math
 
 import gym
 import argparse
@@ -33,6 +34,8 @@ class Trial:
                             help='Which agent to use')
         parser.add_argument('--duplicate', '-d', type=int, default=5,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--action_effect_multiplier', '-e', type=float, default=1,
+                            help='Multiplier in range [0,1] to create semi-duplicate actions from base actions.')
         parser.add_argument('--random_actions', default=False, action='store_true',
                             help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
@@ -48,6 +51,11 @@ class Trial:
         parser.add_argument('--disable_gpu', default=False, action='store_true',
                             help='enforce training on CPU')
         return parser
+    
+    def check_params_validity(self, params):
+        assert 0 <= params['action_effect_multiplier'] <= 1, "action_effect_multiplier must be a float between [0, 1]"
+        logging.info('action_effect_multiplier is {}'.format(params['action_effect_multiplier']))
+        assert params['duplicate'] >= 1, "number of sets fo duplicate actions can't be less than 1"
 
     def parse_common_args(self, parser):
         args, unknown = parser.parse_known_args()
@@ -83,14 +91,14 @@ class Trial:
             assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
-        if isinstance(env.action_space, gym.spaces.Box):
-            env = wrap.DiscreteBox(env)
         if self.params['random_actions']:
             logging.info('making all duplicate actions random actions')
             env = wrap.RandomActions(env, self.params['duplicate'])
         else:
             logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
-            env = wrap.DuplicateActions(env, self.params['duplicate'])
+            env = wrap.DuplicateActions(env, self.params['duplicate'], self.params['action_effect_multiplier'])
+        if isinstance(env.action_space, gym.spaces.Box):
+            env = wrap.DiscreteBox(env)
         env = wrap.TorchInterface(env)
         return env
     
@@ -154,3 +162,33 @@ def update_param(params, name, value):
 def every_n_times(n, count, callback, *args, final_count=None):
     if (count % n == 0) or (final_count is not None and (count == final_count)):
         callback(*args)
+
+
+def get_action_similarity_for_discrete_action_space(a, n_dup, n_total_actions, similarity_score):
+    """
+    return a list of similarity scores of 'a' with all the actions in the action_space
+    a: action being taken
+    n_dup: number of sets of duplicated actions
+    n_total_actions: number of total discrete actions in action space
+    similarity_score: similarity score of the duplicated actions
+    """
+    original_env_a = math.floor(a / n_dup)
+    # whether 'a' corresponds the an action in the original env, or a duplicated action
+    is_original_env_action = a % n_dup == 0
+    # most actions aren't similar at all
+    similarity_scores = [0] * n_total_actions
+    # in case that duplicate action is the same as the original action
+    # currently only the middle-action (no-op) is the same as original action
+    if original_env_a % 2 == 1:
+        similarity_score = 1
+    # if 'a' is an original action
+    if is_original_env_action:
+        similarity_scores[a] = 1
+        for i in range(original_env_a*n_dup+1, (original_env_a+1)*n_dup):
+            similarity_scores[i] = similarity_score
+    # if 'a' in a duplicated action
+    else:
+        similarity_scores[original_env_a * n_dup] = similarity_score
+        for i in range(original_env_a*n_dup+1, (original_env_a+1)*n_dup):
+            similarity_scores[i] = 1
+    return similarity_scores

@@ -51,7 +51,7 @@ class RegressionTrial(TrainTrial):
 
     def setup(self):
         super().setup()
-        self.target_agent = DQNAgent(self.env.observation_space, self.env.action_space, self.params)
+        self.target_agent = DQNAgent(self.env.observation_space, self.env.action_space, self.env.get_action_similarity_scores, self.params)
         if not self.params['test']:
             print("loading from " + self.params['load'])
             self.target_agent.q.load(self.params['load'])
