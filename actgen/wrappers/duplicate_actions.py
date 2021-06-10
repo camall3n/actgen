@@ -12,6 +12,11 @@ class DuplicateActions(gym.Wrapper):
     """
     def __init__(self, env, n_dup, similarity_score=1):
         """
+        when creating a duplicate-action env, there is an option to create semi-duplicate actions by
+        specifying a similarity_score argument. 
+        The resulting space from this wrapper will be Discrete if original env is Discrete, and Box if 
+        original env is Box, and all other env types will trigger an UnImplementedError
+        If the space needs to discretized, use the DiscreteBox wrapper after this wrapper.
         :param env: an unwrapped gym environment that has discrete actions
         :param n_dup: the number of times to duplicate the original actions
                         e.g. n_dup = 3 in a cartpole environment will result in a total of 6 actions
