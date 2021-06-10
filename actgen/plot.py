@@ -127,6 +127,8 @@ def parse_args():
 							help='plot the training curve of all N-dup experiments for different values of N')
 	parser.add_argument('--plot_semi', default=False, action='store_true',
 							help='plot the training curve of all k-semi-dup experiments for different values of k')
+	parser.add_argument('--plot_atari', default=False, action='store_true',
+							help='plot the training curve of atari experiments and with help of inverse models')
 	parser.add_argument('--plot_loss', default=False, action='store_true',
                         	help='plot the training loss')
 	parser.add_argument('--suppress_gscore', default=False, action='store_true',
@@ -163,6 +165,12 @@ def main():
 		for k in all_semi_scores:
 			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "{} semi-duplicate".format(k)
 			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "{} semi-duplicate with oracle".format(k)
+	elif args.plot_atari:
+		args.suppress_gscore = True  # atari doesn't have gscore
+		dirname_to_description = {
+			experiment_dir: "baseline",
+			experiment_dir + "-inv": "with inverse model",
+		}
 	else:
 		# default option
 		dirname_to_description[experiment_dir + "-rand"] = "random actions"
