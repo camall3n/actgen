@@ -4,7 +4,7 @@ episode_life,True,bool
 clip_rewards,True,bool
 frame_stack,True,bool
 scale_pixel_values,True,bool
-max_env_steps,200000000,int
+max_env_steps,10000000,int
 max_episode_steps,4500,int
 eval_every_n_steps,200000,int
 gscore_every_n_steps,250000,int
@@ -31,3 +31,7 @@ change_percentage_thresh,0.10,float
 gscore_optimizer,sgd,str
 pin_other_q_values,True,bool
 dqn_train_pin_other_q_values,True,bool
+latent_dim,3136,int
+inv_layer_size,512,int
+inv_learning_rate,0.00003,float
+inv_clip_threshold,0.1,float

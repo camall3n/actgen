@@ -59,6 +59,9 @@ class TrainTrial(Trial):
 
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
+        
+        if self.params['oracle'] and self.params['atari']:
+            raise RuntimeError("atari domains don't have an exact oracle")
 
         self.determine_device()
 

@@ -45,6 +45,10 @@ class Trial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
+        parser.add_argument('--inv_model', default=False, action='store_true',
+                            help='use the inverse model to guide Q-updates')
+        parser.add_argument('--remove_redundant_actions', default=False, action='store_true',
+                            help='remove the redundant diagonal actions in MsPacman')
         parser.add_argument('--disable_gpu', default=False, action='store_true',
                             help='enforce training on CPU')
         return parser
@@ -83,6 +87,9 @@ class Trial:
             assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
+        if self.params['remove_redundant_actions']:
+            logging.info('removing redundant actions from the gym env')
+            env = wrap.RemoveRedundantActions(env)
         if isinstance(env.action_space, gym.spaces.Box):
             env = wrap.DiscreteBox(env)
         if self.params['random_actions']:
