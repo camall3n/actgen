@@ -6,7 +6,7 @@ class RandomAgent:
         self.observation_space = observation_space
         self.action_space = action_space
 
-    def save(self, is_best):
+    def save(self, fname, dir, is_best):
         pass
 
     def act(self, state, testing=False):
