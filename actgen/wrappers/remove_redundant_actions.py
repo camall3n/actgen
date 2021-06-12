@@ -30,7 +30,7 @@ def test_remove_redundant_actions_env():
 
 	assert env.action_space.n == 5
 
-	assert 0 <= env.action_space.sample() <= 4
+	assert env.action_space == gym.spaces.Discrete(5)
 
 	assert env.observation_space == gym.make('MsPacmanNoFrameskip-v4').observation_space
 
