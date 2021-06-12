@@ -24,6 +24,7 @@ class InverseModel(nnutils.Network):
         )
         if self.discrete:
             self.log_pr_linear = torch.nn.Linear(params['inv_layer_size'], n_actions)
+            self.softmax = torch.nn.Softmax(dim=-1)
             self.cross_entropy = torch.nn.CrossEntropyLoss()
         else:
             self.mean_linear = torch.nn.Linear(params['inv_layer_size'], n_actions)
@@ -45,7 +46,8 @@ class InverseModel(nnutils.Network):
         shared_vector = self.body(context)
 
         if self.discrete:
-            return self.log_pr_linear(shared_vector)
+            logits = self.log_pr_linear(shared_vector)
+            return self.softmax(logits)
         else:
             mean = self.mean_linear(shared_vector)
             log_std = self.log_std_linear(shared_vector)
