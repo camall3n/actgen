@@ -51,10 +51,15 @@ class DQNAgent():
         self.replay.push(experience)
 
     def update(self):
+        if len(self.replay) >= self.params['batch_size']:
+            batch = self.replay.sample(self.params['batch_size'])
+
+            # always update inverse model
+            if self.params['inv_model']:
+                self.inverse_predictor.update(batch, encoder=self.q.encoder)
+
         if len(self.replay) < self.params['replay_warmup_steps']:
             return 0.0
-
-        batch = self.replay.sample(self.params['batch_size'])
 
         self.q.train()
         self.optimizer.zero_grad()
@@ -80,10 +85,6 @@ class DQNAgent():
             # hard copy
             if self.n_training_steps % self.params['target_copy_period'] == 0:
                 self.q_target.hard_copy_from(self.q)
-        
-        # update inverse model
-        if self.params['inv_model']:
-            self.inverse_predictor.update(batch, encoder=self.q.encoder)
 
         return loss.detach().item()
 
@@ -109,6 +110,10 @@ class DQNAgent():
                 all_duplicate_actions = self.get_duplicate_actions_fn(acted)
                 similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
         elif self.params['inv_model']:
+            # don't use the inverse model in early stages of training
+            if self.n_training_steps < self.params['inv_warmup_steps']:
+                return similarity_mat
+            # use the inverse model
             action_probs = self.inverse_predictor.predict(batch, encoder=self.q.encoder)  # (batch_size, n_actions)
             # scale the probabilities linearly so that the actual action taken has probability 1
             scale = 1 / extract(action_probs, action_taken, idx_dim=-1).view((self.params['batch_size'], 1))

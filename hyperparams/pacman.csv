@@ -35,3 +35,4 @@ latent_dim,3136,int
 inv_layer_size,512,int
 inv_learning_rate,0.00003,float
 inv_clip_threshold,0.5,float
+inv_warmup_steps,10000,int
