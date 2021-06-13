@@ -110,7 +110,11 @@ class DQNAgent():
                 similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
         elif self.params['inv_model']:
             action_probs = self.inverse_predictor.predict(batch, encoder=self.q.encoder)  # (batch_size, n_actions)
-            clipped_action_probs = torch.clip(action_probs, min=self.params['inv_clip_threshold'])  # (batch_size, n_actions)
+            # scale the probabilities linearly so that the actual action taken has probability 1
+            scale = 1 / extract(action_probs, action_taken, idx_dim=-1).view((self.params['batch_size'], 1))
+            scaled_action_probs = scale * action_probs
+            # those with probabilities lower than 0.5 are deemed none-similar actions
+            clipped_action_probs = torch.where(scaled_action_probs < self.params['inv_clip_threshold'], 0, scaled_action_probs)
             similarity_mat = clipped_action_probs
         return similarity_mat
 
