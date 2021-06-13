@@ -36,6 +36,8 @@ class InverseModel(nnutils.Network):
         Compute the action distribution for two subsequent states.
 
         If the action space is discrete, the output will be log probabilities,
+        (It's the output of a linear layer without a softmax, so effectively 
+        it is the log of probabilities )
         otherwise it will be the mean and std deviation of a multivariate
         Gaussian distribution with diagonal covariance matrix.
 

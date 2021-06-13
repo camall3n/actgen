@@ -23,7 +23,9 @@ class InversePredictor():
 		# inverse model takes in embeddings, not states
 		z = encoder(s)
 		zp = encoder(sp)
-		return self.inv_model.forward(z, zp)
+		logits = self.inv_model.forward(z, zp)
+		probs = torch.nn.functional.softmax(logits, dim=-1)
+		return probs
 	
 	def update(self, batch, encoder):
 		self.inv_model.train()
