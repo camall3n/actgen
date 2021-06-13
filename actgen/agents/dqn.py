@@ -107,8 +107,8 @@ class DQNAgent():
             # all duplicate actions are fully similar
             # for each action taken in the batch
             for i, acted in enumerate(action_taken):
-                all_duplicate_actions = self.get_duplicate_actions_fn(acted)
-                similarity_mat[i, all_duplicate_actions] = 1  # update each row in similarity_mat
+                action_similarity_scores = self.get_duplicate_actions_fn(acted)
+                similarity_mat[i] = torch.as_tensor(action_similarity_scores)  # update each row in similarity_mat
         elif self.params['inv_model']:
             # don't use the inverse model in early stages of training
             if self.n_training_steps < self.params['inv_warmup_steps']:

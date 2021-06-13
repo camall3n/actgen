@@ -46,12 +46,13 @@ class ManipulationTrial(Trial):
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.test_env = test_env
          
+        self.check_params_validity(self.params)
         self.determine_device()
 
         if self.params['agent'] == 'dqn':
-            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
+            self.agent = DQNAgent(test_env.observation_space, test_env.action_space, test_env.get_action_similarity_scores, self.params)
         elif self.params['agent'] == 'action_dqn':
-            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, test_env.get_duplicate_actions, self.params)
+            self.agent = ActionDQNAgent(test_env.observation_space, test_env.action_space, test_env.get_action_similarity_scores, self.params)
 
         # load saved model
         if not self.params['test']:

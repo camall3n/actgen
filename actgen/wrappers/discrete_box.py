@@ -1,5 +1,9 @@
+import math
+
 import gym
 import numpy as np
+
+from .. import utils
 
 class DiscreteBox(gym.Wrapper):
     """
@@ -11,15 +15,16 @@ class DiscreteBox(gym.Wrapper):
         """
         super().__init__(env)
         self.shape = env.action_space.shape
-        assert len(self.shape) == 1
-        self.n_dims = self.shape[0]
+        self.n_dims = self.shape[-1]
         self.high = env.action_space.high
         self.low = env.action_space.low
+        if len(self.high.shape) == 1 or len(self.low.shape) == 1:
+            self.high = np.expand_dims(self.high, 0)
+            self.low = np.expand_dims(self.low, 0)
         self.mid = (self.low + self.high)/2
-        value_lists = [
-            [self.low[i], self.mid[i], self.high[i]] for i in range(self.n_dims)
-        ]
-        self.actions = np.array(np.meshgrid(*value_lists)).T.reshape(-1, self.n_dims)
+        self.n_dup = self.high.shape[0]
+        all_atomic_actions = np.concatenate([self.low, self.mid, self.high], axis=0).T
+        self.actions = np.array(np.meshgrid(*all_atomic_actions)).T.reshape(-1, self.n_dims)
         self.action_space = gym.spaces.Discrete(len(self.actions))
 
     def step(self, action):
@@ -31,6 +36,9 @@ class DiscreteBox(gym.Wrapper):
             raise RuntimeError("trying to take action not in action space")
         original_a = self.actions[action]  # the corresponding original action of the original env
         return self.env.step(original_a)
+    
+    def get_action_similarity_scores(self, a):
+        return utils.get_action_similarity_for_discrete_action_space(a, self.n_dup, self.action_space.n, self.similarity_score)
 
 
 def test_discrete_box():
@@ -43,7 +51,7 @@ def test_discrete_box():
     env = gym.make("Pendulum-v0")
     env.action_space = gym.spaces.Box(low=-2, high=2, shape=(2,), dtype=np.float32)
     env = DiscreteBox(env)
-    assert env.action_space.n == 9
+    assert env.action_space.n == 9, env.action_space.n
 
 
 if __name__ == '__main__':
