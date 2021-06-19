@@ -119,7 +119,7 @@ class DQNAgent():
             scale = 1 / extract(action_probs, action_taken, idx_dim=-1).view((self.params['batch_size'], 1))
             scaled_action_probs = scale * action_probs
             # those with probabilities lower than 0.5 are deemed none-similar actions
-            clipped_action_probs = torch.where(scaled_action_probs < self.params['inv_clip_threshold'], 0, scaled_action_probs)
+            clipped_action_probs = torch.where(scaled_action_probs < self.params['inv_clip_threshold'], torch.tensor(0.), scaled_action_probs)
             similarity_mat = clipped_action_probs
         return similarity_mat
 
