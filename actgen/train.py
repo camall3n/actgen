@@ -63,6 +63,8 @@ class TrainTrial(Trial):
         
         if self.params['oracle'] and self.params['atari']:
             raise RuntimeError("atari domains don't have an exact oracle")
+        if self.params['full_action_space'] and not self.params['atari']:
+            raise RuntimeError("only atari envs have full action sets")
 
         self.determine_device()
 

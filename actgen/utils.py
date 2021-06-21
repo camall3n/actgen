@@ -36,6 +36,8 @@ class Trial:
                             help='Number of times to duplicate actions')
         parser.add_argument('--action_effect_multiplier', '-e', type=float, default=1,
                             help='Multiplier in range [0,1] to create semi-duplicate actions from base actions.')
+        parser.add_argument('--full_action_space', default=False, action='store_true',
+                            help='use the full action set (18 actions) for atari envs')
         parser.add_argument('--random_actions', default=False, action='store_true',
                             help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
@@ -90,7 +92,8 @@ class Trial:
                     episode_life=(self.params['episode_life'] and not test),
                     clip_rewards=(self.params['clip_rewards'] and not test),
                     frame_stack=self.params['frame_stack'],
-                    scale=self.params['scale_pixel_values'])
+                    scale=self.params['scale_pixel_values'],
+                    full_action_space=self.params['full_action_space'])
         else:
             assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
