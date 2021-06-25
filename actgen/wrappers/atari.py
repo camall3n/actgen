@@ -329,7 +329,8 @@ def make_deepmind_atari(
     if full_action_space:
         from gym.envs.atari.atari_env import AtariEnv
         name_to_rom = {
-            "MsPacman": "ms_pacman"
+            "MsPacman": "ms_pacman",
+            "Breakout": "breakout",
         }
         env = AtariEnv(game=name_to_rom[env_name], obs_type='image', frameskip=1, full_action_space=True)
     else:
