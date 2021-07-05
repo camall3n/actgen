@@ -12,7 +12,7 @@ save_loss_every_n_steps,-1,int
 n_eval_episodes,5,int
 n_gscore_states,100,int
 updates_per_env_step,1,int
-learning_rate,0.00003,float
+learning_rate,0.00001,float
 epsilon_during_eval,0.02,float
 epsilon_final,0.02,float
 epsilon_decay_period,1000000,int
