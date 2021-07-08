@@ -4,4 +4,5 @@ from .duplicate_actions import DuplicateActions
 from .remove_redundant_actions import RemoveRedundantActions
 from .random_actions import RandomActions
 from .discrete_box import DiscreteBox
+from .similarity_oracle import SimilarityOracle
 from .atari import make_deepmind_atari

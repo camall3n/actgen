@@ -62,7 +62,11 @@ class TrainTrial(Trial):
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
         
         if self.params['oracle'] and self.params['atari']:
-            raise RuntimeError("atari domains don't have an exact oracle")
+            if self.params['env_name'] in ['Breakout']:
+                # we can hand code a similarity oracle if the full action space is used
+                assert self.params['full_action_space']
+            else:
+                raise RuntimeError("most atari domains don't have an exact oracle")
         if self.params['full_action_space'] and not self.params['atari']:
             raise RuntimeError("only atari envs have full action sets")
 
