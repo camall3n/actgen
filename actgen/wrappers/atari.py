@@ -332,6 +332,7 @@ def make_deepmind_atari(
             "MsPacman": "ms_pacman",
             "Breakout": "breakout",
             "SpaceInvaders": "space_invaders",
+            "Pong": "pong",
         }
         env = AtariEnv(game=name_to_rom[env_name], obs_type='image', frameskip=1, full_action_space=True)
     else:
