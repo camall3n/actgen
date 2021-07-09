@@ -99,6 +99,8 @@ class Trial:
                 env = wrap.RemoveRedundantActions(env)
             if self.params['oracle']:
                 env = wrap.SimilarityOracle(env)
+            else:
+                env = wrap.IdentityWrapper(env)
         else:
             assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
