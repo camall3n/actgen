@@ -115,12 +115,10 @@ class DQNAgent():
                 return similarity_mat
             # use the inverse model
             action_probs = self.inverse_predictor.predict(batch, encoder=self.q.encoder)  # (batch_size, n_actions)
-            # scale the probabilities linearly so that the actual action taken has probability 1
-            scale = 1 / extract(action_probs, action_taken, idx_dim=-1).view((self.params['batch_size'], 1))
-            scaled_action_probs = scale * action_probs
-            # those with probabilities lower than 0.5 are deemed none-similar actions
-            clipped_action_probs = torch.where(scaled_action_probs < self.params['inv_clip_threshold'], torch.tensor(0.).to(self.params['device']), scaled_action_probs)
-            similarity_mat = clipped_action_probs
+            # modify so that the actual action taken has probability 1
+            for i, action in enumerate(action_taken):
+                action_probs[i, action] = 1
+            similarity_mat = action_probs
         return similarity_mat
 
     def _get_q_targets(self, batch):
