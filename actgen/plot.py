@@ -102,6 +102,7 @@ def plot_reward(data, env_name, save_path=None):
 	plt.show()
 	if save_path:
 		plt.savefig(save_path)
+	plt.close()
 
 
 def plot_batch_loss(data, env_name):
@@ -143,12 +144,12 @@ def parse_args():
 def main():
 	# parse arguments
 	args = parse_args()
-	experiment_dir = Path(args.results_dir + args.tag)
+	experiment_dir = args.results_dir + args.tag
 
 	# learning curve to tune learning rate
 	if args.tune_lr:
 		tune_data = gather_data_for_param_tuning(args.results_dir, args.tag, param_tuned='lr')
-		plot_reward(tune_data, args.tag, save_path=experiment_dir.joinpath('learning_curve.jpg'))
+		plot_reward(tune_data, args.tag, save_path= os.path.join(experiment_dir, 'learning_curve.jpg'))
 		return
 	
 	# all data that needs to be plotted
@@ -183,7 +184,7 @@ def main():
 
 	# plot reward
 	reward_data = preprocess_data("training_reward.csv", dirname_to_description)
-	plot_reward(reward_data, args.tag, save_path=experiment_dir.joinpath('learning_curve.jpg'))
+	plot_reward(reward_data, args.tag, save_path=os.path.join(experiment_dir, 'learning_curve.jpg'))
 
 	# plot g score
 	if not args.suppress_gscore:
