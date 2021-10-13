@@ -46,10 +46,10 @@ def preprocess_data(file_ending, dirname_to_description):
 		all_files = iterate_through_directory(dirname, file_ending)
 		if not all_files:
 			continue  # for non-existent directories
-		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files])
+		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files], ignore_index=True)
 		data_in_dir['agent'] = description
 		accumulated_data.append(data_in_dir)
-	accumulated_data = pd.concat(accumulated_data)
+	accumulated_data = pd.concat(accumulated_data, ignore_index=True)
 
 	return accumulated_data
 
