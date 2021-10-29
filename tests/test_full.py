@@ -5,6 +5,7 @@ from actgen.wrappers.discrete_box import test_discrete_box
 from actgen.wrappers.remove_redundant_actions import test_remove_redundant_actions_env
 from actgen.wrappers.similarity_oracle import test_similarity_oracle_env
 from actgen.wrappers.identity import test_identity_env
+from actgen.wrappers.atari_more_noop import test_atari_more_noop_env
 from actgen.train import main as train
 from actgen.evaluate_dqn import main as evaluate_dqn
 from actgen.change_q import main as change_q

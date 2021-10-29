@@ -32,8 +32,10 @@ class Trial:
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
-        parser.add_argument('--duplicate', '-d', type=int, default=5,
+        parser.add_argument('--duplicate', '-d', type=int, default=1,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--num_noop_sets', type=int, default=0,
+                            help='add some number of noop action sets to the original action set')
         parser.add_argument('--action_effect_multiplier', '-e', type=float, default=1,
                             help='Multiplier in range [0,1] to create semi-duplicate actions from base actions.')
         parser.add_argument('--full_action_space', default=False, action='store_true',
@@ -62,6 +64,9 @@ class Trial:
         assert 0 <= params['action_effect_multiplier'] <= 1, "action_effect_multiplier must be a float between [0, 1]"
         logging.info('action_effect_multiplier is {}'.format(params['action_effect_multiplier']))
         assert params['duplicate'] >= 1, "number of sets fo duplicate actions can't be less than 1"
+        if params['num_noop_sets'] > 0:
+            assert params['atari']
+            assert params['duplicate'] == 1
 
     def parse_common_args(self, parser):
         args, unknown = parser.parse_known_args()
@@ -97,6 +102,10 @@ class Trial:
             if self.params['remove_redundant_actions']:
                 logging.info('removing redundant actions from the gym env')
                 env = wrap.RemoveRedundantActions(env)
+            if self.params['num_noop_sets'] > 0:
+                env = wrap.AtariMoreNoops(env, n_dup=self.params['num_noop_sets']+1)
+            if self.params['duplicate'] > 1:
+                env = wrap.DuplicateActions(env, n_dup=self.params['duplicate'])
             if self.params['oracle']:
                 env = wrap.SimilarityOracle(env)
             else:
