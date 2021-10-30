@@ -105,6 +105,7 @@ class Trial:
             if self.params['num_noop_sets'] > 0:
                 env = wrap.AtariMoreNoops(env, n_dup=self.params['num_noop_sets']+1)
             if self.params['duplicate'] > 1:
+                logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
                 env = wrap.DuplicateActions(env, n_dup=self.params['duplicate'])
             if self.params['oracle']:
                 env = wrap.SimilarityOracle(env)
