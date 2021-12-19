@@ -1,5 +1,5 @@
 # actgen
-Action Generalization
+Explicit Action Generalization
 
 ## Installing
 ```bash
@@ -8,16 +8,14 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Running
+## Training a Q-Learning agent 
 ```bash
-python3 -m actgen.train
+python3 -m actgen.train --tag experiment_name --env_name atari_env --agent dqn [--options] 
 ```
+use different option flags to use different action augmentation themes
 
-## Experiment 1: update q(s,a) and observe q(s, \tilde(a))
+## Plotting the result
+plot the results of a specific training run using the same `--tag` specified in training
 ```bash
-python3 -m actgen.change_q
-```
-## Testing
-```bash
-python3 -m actgen.test
+python3 --tag experiment_name --plot_atari
 ```

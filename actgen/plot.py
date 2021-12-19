@@ -173,8 +173,9 @@ def main():
 		args.suppress_gscore = True  # atari doesn't have gscore
 		dirname_to_description = {
 			experiment_dir: "baseline",
-			experiment_dir + "-inv": "with inverse model",
+			experiment_dir + "-5dup": "4 sets of duplicate actions",
 			experiment_dir + "-full": "full action set (18 actions)",
+			experiment_dir + "-more-noop": "2 noop action sets",
 			experiment_dir + "-oracle": "similarity oracle",
 		}
 	else:
