@@ -6,13 +6,13 @@ frame_stack,True,bool
 scale_pixel_values,True,bool
 max_env_steps,10000000,int
 max_episode_steps,4500,int
-eval_every_n_steps,50000,int
+eval_every_n_steps,200000,int
 gscore_every_n_steps,250000,int
 save_loss_every_n_steps,-1,int
-n_eval_episodes,10,int
+n_eval_episodes,5,int
 n_gscore_states,100,int
 updates_per_env_step,1,int
-learning_rate,0.0001,float
+learning_rate,0.00001,float
 epsilon_during_eval,0.02,float
 epsilon_final,0.02,float
 epsilon_decay_period,1000000,int
@@ -33,6 +33,6 @@ pin_other_q_values,True,bool
 dqn_train_pin_other_q_values,True,bool
 latent_dim,3136,int
 inv_layer_size,512,int
-inv_learning_rate,0.0001,float
+inv_learning_rate,0.00003,float
 inv_clip_threshold,0.5,float
 inv_warmup_steps,10000,int

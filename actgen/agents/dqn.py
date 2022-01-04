@@ -3,9 +3,10 @@ import math
 import numpy as np
 import torch
 
-from ..nnutils import extract, MLP, one_hot, Sequential
+from ..nnutils import extract, MLP, one_hot
 from .replaymemory import ReplayMemory
-from ..model import NatureDQN
+from ..models import NatureDQN
+from .inverse_predictor import InversePredictor
 
 class DQNAgent():
     def __init__(self, observation_space, action_space, get_duplicate_actions_fn, params):
@@ -28,8 +29,13 @@ class DQNAgent():
         params = list(self.q.parameters())
         self.optimizer = torch.optim.Adam(params, lr=self.params['learning_rate'])
 
+        if self.params['inv_model']:
+            self.inverse_predictor = InversePredictor(action_space.n, self.params, discrete=True)
+
     def save(self, fname, dir, is_best):
         self.q.save(fname, dir, is_best)
+        if self.params['inv_model']:
+            self.inverse_predictor.save(fname, dir, is_best)
 
     def act(self, x, testing=False):
         if ((len(self.replay) < self.params['replay_warmup_steps']
@@ -45,10 +51,15 @@ class DQNAgent():
         self.replay.push(experience)
 
     def update(self):
+        if len(self.replay) >= self.params['batch_size']:
+            batch = self.replay.sample(self.params['batch_size'])
+
+            # always update inverse model
+            if self.params['inv_model']:
+                self.inverse_predictor.update(batch, encoder=self.q.encoder)
+
         if len(self.replay) < self.params['replay_warmup_steps']:
             return 0.0
-
-        batch = self.replay.sample(self.params['batch_size'])
 
         self.q.train()
         self.optimizer.zero_grad()
@@ -81,9 +92,8 @@ class DQNAgent():
         if testing:
             epsilon = self.params['epsilon_during_eval']
         else:
-            alpha = (len(self.replay) - self.params['replay_warmup_steps']) / self.params['epsilon_decay_period']
-            alpha = np.clip(alpha, 0, 1)
-            epsilon = self.params['epsilon_final'] * alpha + 1 * (1 - alpha)
+            epsilon = (self.params['epsilon_final'] + (1 - self.params['epsilon_final'])
+                 * math.exp(-1. * self.n_training_steps / self.params['epsilon_decay_period']))
         return epsilon
 
     def _get_action_similarities(self, batch):
@@ -99,6 +109,16 @@ class DQNAgent():
             for i, acted in enumerate(action_taken):
                 action_similarity_scores = self.get_duplicate_actions_fn(acted)
                 similarity_mat[i] = torch.as_tensor(action_similarity_scores)  # update each row in similarity_mat
+        elif self.params['inv_model']:
+            # don't use the inverse model in early stages of training
+            if self.n_training_steps < self.params['inv_warmup_steps']:
+                return similarity_mat
+            # use the inverse model
+            action_probs = self.inverse_predictor.predict(batch, encoder=self.q.encoder)  # (batch_size, n_actions)
+            # modify so that the actual action taken has probability 1
+            for i, action in enumerate(action_taken):
+                action_probs[i, action] = 1
+            similarity_mat = action_probs
         return similarity_mat
 
     def _get_q_targets(self, batch):

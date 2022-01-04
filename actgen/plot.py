@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+from pathlib import Path
 
 from matplotlib import pyplot as plt
 import pandas as pd
@@ -45,10 +46,10 @@ def preprocess_data(file_ending, dirname_to_description):
 		all_files = iterate_through_directory(dirname, file_ending)
 		if not all_files:
 			continue  # for non-existent directories
-		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files])
+		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files], ignore_index=True)
 		data_in_dir['agent'] = description
 		accumulated_data.append(data_in_dir)
-	accumulated_data = pd.concat(accumulated_data)
+	accumulated_data = pd.concat(accumulated_data, ignore_index=True)
 
 	return accumulated_data
 
@@ -87,7 +88,7 @@ def plot_g_score(data, env_name):
 	plt.show()
 
 
-def plot_reward(data, env_name):
+def plot_reward(data, env_name, save_path=None):
 	"""
 	plot the reward results of all the agent types from a single gym environment
 	"""
@@ -99,6 +100,9 @@ def plot_reward(data, env_name):
 	)
 	plt.title('training curve of {}'.format(env_name))
 	plt.show()
+	if save_path:
+		plt.savefig(save_path)
+	plt.close()
 
 
 def plot_batch_loss(data, env_name):
@@ -127,6 +131,8 @@ def parse_args():
 							help='plot the training curve of all N-dup experiments for different values of N')
 	parser.add_argument('--plot_semi', default=False, action='store_true',
 							help='plot the training curve of all k-semi-dup experiments for different values of k')
+	parser.add_argument('--plot_atari', default=False, action='store_true',
+							help='plot the training curve of atari experiments and with help of inverse models')
 	parser.add_argument('--plot_loss', default=False, action='store_true',
                         	help='plot the training loss')
 	parser.add_argument('--suppress_gscore', default=False, action='store_true',
@@ -143,7 +149,7 @@ def main():
 	# learning curve to tune learning rate
 	if args.tune_lr:
 		tune_data = gather_data_for_param_tuning(args.results_dir, args.tag, param_tuned='lr')
-		plot_reward(tune_data, args.tag)
+		plot_reward(tune_data, args.tag, save_path= os.path.join(experiment_dir, 'learning_curve.jpg'))
 		return
 	
 	# all data that needs to be plotted
@@ -163,6 +169,15 @@ def main():
 		for k in all_semi_scores:
 			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "{} semi-duplicate".format(k)
 			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "{} semi-duplicate with oracle".format(k)
+	elif args.plot_atari:
+		args.suppress_gscore = True  # atari doesn't have gscore
+		dirname_to_description = {
+			experiment_dir: "baseline",
+			experiment_dir + "-5dup": "4 sets of duplicate actions",
+			experiment_dir + "-full": "full action set (18 actions)",
+			experiment_dir + "-more-noop": "2 noop action sets",
+			experiment_dir + "-oracle": "similarity oracle",
+		}
 	else:
 		# default option
 		dirname_to_description[experiment_dir + "-rand"] = "random actions"
@@ -170,7 +185,7 @@ def main():
 
 	# plot reward
 	reward_data = preprocess_data("training_reward.csv", dirname_to_description)
-	plot_reward(reward_data, args.tag)
+	plot_reward(reward_data, args.tag, save_path=os.path.join(experiment_dir, 'learning_curve.jpg'))
 
 	# plot g score
 	if not args.suppress_gscore:

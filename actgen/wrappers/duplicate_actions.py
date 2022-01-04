@@ -91,8 +91,6 @@ def test_duplicate_action_env():
 
     assert env.action_space.n == 4
 
-    assert 0 <= env.action_space.sample() < 4
-
     assert env.observation_space == gym.make("CartPole-v0").observation_space
 
     env = DuplicateActions(gym.make('Pendulum-v0'), 2)  # Box action space
@@ -105,5 +103,3 @@ def test_duplicate_action_env():
 
 if __name__ == '__main__':
     test_duplicate_action_env()
-
-# %%

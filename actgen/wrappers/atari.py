@@ -322,10 +322,23 @@ def make_deepmind_atari(
         episode_life=False,
         clip_rewards=True,
         frame_stack=True,
-        scale=False):
+        scale=False,
+        full_action_space=False):
     """Configure environment for DeepMind-style Atari.
     """
-    env = gym.make('{}NoFrameskip-v4'.format(env_name))
+    if full_action_space:
+        from gym.envs.atari.atari_env import AtariEnv
+        name_to_rom = {
+            "MsPacman": "ms_pacman",
+            "Breakout": "breakout",
+            "SpaceInvaders": "space_invaders",
+            "Pong": "pong",
+            "BeamRider": "beam_rider",
+            "Qbert": "qbert",
+        }
+        env = AtariEnv(game=name_to_rom[env_name], obs_type='image', frameskip=1, full_action_space=True)
+    else:
+        env = gym.make('{}NoFrameskip-v4'.format(env_name))
     env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
     if max_episode_steps is not None:

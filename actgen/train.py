@@ -1,5 +1,4 @@
 import argparse
-import copy
 import csv
 import logging
 import os
@@ -51,8 +50,8 @@ class TrainTrial(Trial):
 
     def setup(self):
         seeding.seed(0, random, torch, np)
-        env = self.make_gym_env()
-        test_env = copy.deepcopy(env)
+        env = self.make_gym_env(test=False)
+        test_env = self.make_gym_env(test=True)
         seeding.seed(self.params['seed'], gym, env)
         seeding.seed(1000 + self.params['seed'], gym, test_env)
         self.env = env
@@ -61,6 +60,17 @@ class TrainTrial(Trial):
         self.check_params_validity(self.params)
         if self.params['oracle'] and not self.params['dqn_train_pin_other_q_values']:
             raise RuntimeError('dqn_train_pin_other_q_values must be set to true when performing oracle action generalization')
+        
+        if self.params['oracle'] and self.params['atari']:
+            if self.params['env_name'] in ['Breakout']:
+                # we can hand code a similarity oracle if the full action space is used
+                assert self.params['full_action_space']
+            else:
+                raise RuntimeError("most atari domains don't have an exact oracle")
+        if self.params['full_action_space'] and not self.params['atari']:
+            raise RuntimeError("only atari envs have full action sets")
+        if self.params['full_action_space']:
+            assert self.env.action_space.n == 18
 
         self.determine_device()
 
@@ -203,7 +213,8 @@ class TrainTrial(Trial):
             else:
                 s = sp
             utils.every_n_times(self.params['eval_every_n_steps'], step, self.evaluate, step)
-            utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
+            if self.params['save_loss_every_n_steps'] > 0:
+                utils.every_n_times(self.params['save_loss_every_n_steps'], step, self.save_batch_loss, step, loss)
             if self.params['gscore']:
                 utils.every_n_times(self.params['gscore_every_n_steps'], step, self.gscore_callback, step)
         self.teardown()

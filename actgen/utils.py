@@ -32,10 +32,14 @@ class Trial:
         parser.add_argument('--agent', type=str, default='dqn',
                             choices=['dqn', 'random', 'action_dqn'],
                             help='Which agent to use')
-        parser.add_argument('--duplicate', '-d', type=int, default=5,
+        parser.add_argument('--duplicate', '-d', type=int, default=1,
                             help='Number of times to duplicate actions')
+        parser.add_argument('--num_noop_sets', type=int, default=0,
+                            help='add some number of noop action sets to the original action set')
         parser.add_argument('--action_effect_multiplier', '-e', type=float, default=1,
                             help='Multiplier in range [0,1] to create semi-duplicate actions from base actions.')
+        parser.add_argument('--full_action_space', default=False, action='store_true',
+                            help='use the full action set (18 actions) for atari envs')
         parser.add_argument('--random_actions', default=False, action='store_true',
                             help='Make the duplicate actions all random actions')
         parser.add_argument('--seed', '-s', type=int, default=0,
@@ -48,6 +52,10 @@ class Trial:
                             help='Path to the result directory to save model files')
         parser.add_argument('--tag', type=str, default='default_exp',
                             help='A tag for the current experiment, used as a subdirectory name for saving models')
+        parser.add_argument('--inv_model', default=False, action='store_true',
+                            help='use the inverse model to guide Q-updates')
+        parser.add_argument('--remove_redundant_actions', default=False, action='store_true',
+                            help='remove the redundant diagonal actions in MsPacman')
         parser.add_argument('--disable_gpu', default=False, action='store_true',
                             help='enforce training on CPU')
         return parser
@@ -56,6 +64,9 @@ class Trial:
         assert 0 <= params['action_effect_multiplier'] <= 1, "action_effect_multiplier must be a float between [0, 1]"
         logging.info('action_effect_multiplier is {}'.format(params['action_effect_multiplier']))
         assert params['duplicate'] >= 1, "number of sets fo duplicate actions can't be less than 1"
+        if params['num_noop_sets'] > 0:
+            assert params['atari']
+            assert params['duplicate'] == 1
 
     def parse_common_args(self, parser):
         args, unknown = parser.parse_known_args()
@@ -76,27 +87,40 @@ class Trial:
             update_param(params, arg_name, arg_value)
         return params
     
-    def make_gym_env(self):
+    def make_gym_env(self, test=False):
         if self.params['atari']:
             env = wrap.make_deepmind_atari(
                     self.params['env_name'],
                     max_episode_steps=(
                     self.params['max_episode_steps'] if self.params['max_episode_steps'] > 0 else None
                     ),
-                    episode_life=self.params['episode_life'],
-                    clip_rewards=self.params['clip_rewards'],
+                    episode_life=(self.params['episode_life'] and not test),
+                    clip_rewards=(self.params['clip_rewards'] and not test),
                     frame_stack=self.params['frame_stack'],
-                    scale=self.params['scale_pixel_values'])
+                    scale=self.params['scale_pixel_values'],
+                    full_action_space=self.params['full_action_space'])
+            if self.params['remove_redundant_actions']:
+                logging.info('removing redundant actions from the gym env')
+                env = wrap.RemoveRedundantActions(env)
+            if self.params['num_noop_sets'] > 0:
+                env = wrap.AtariMoreNoops(env, n_dup=self.params['num_noop_sets']+1)
+            if self.params['duplicate'] > 1:
+                logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
+                env = wrap.DuplicateActions(env, n_dup=self.params['duplicate'])
+            if self.params['oracle']:
+                env = wrap.SimilarityOracle(env)
+            else:
+                env = wrap.IdentityWrapper(env)
         else:
             assert self.params['env_name'] in ['CartPole-v0', 'Pendulum-v0', 'LunarLander-v2']
             env = gym.make(self.params['env_name'])
             env = wrap.FixedDurationHack(env)
-        if self.params['random_actions']:
-            logging.info('making all duplicate actions random actions')
-            env = wrap.RandomActions(env, self.params['duplicate'])
-        else:
-            logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
-            env = wrap.DuplicateActions(env, self.params['duplicate'], self.params['action_effect_multiplier'])
+            if self.params['random_actions']:
+                logging.info('making all duplicate actions random actions')
+                env = wrap.RandomActions(env, self.params['duplicate'])
+            else:
+                logging.info('making {} sets of exactly same duplicate actions'.format(self.params['duplicate']))
+                env = wrap.DuplicateActions(env, self.params['duplicate'], self.params['action_effect_multiplier'])
         if isinstance(env.action_space, gym.spaces.Box):
             env = wrap.DiscreteBox(env)
         env = wrap.TorchInterface(env)
