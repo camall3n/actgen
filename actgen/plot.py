@@ -88,17 +88,37 @@ def plot_g_score(data, env_name):
 	plt.show()
 
 
+env_id_2_env_name = {
+	"cartpole-dqn": "CartPole",
+	"pendulum-dqn": "Pendulum",
+	"lander-dqn": "LunarLander",
+	"beam-rider": "Beam Rider",
+	"breakout": "Breakout",
+	"pacman": "Ms Pacman",
+	"space-invaders": "Space Invaders",
+	"qbert": "Qbert",
+	"pong": "Pong",
+}
+
+
 def plot_reward(data, env_name, save_path=None):
 	"""
 	plot the reward results of all the agent types from a single gym environment
 	"""
-	sns.set_theme()
-	sns.relplot(
+	# sns.set_theme()
+	ax = sns.relplot(
 		data=data, kind="line",
 		x='training step', y='reward during evaluation callback',
-		hue='agent', style='agent'
+		hue='agent', 
+		style='agent',
 	)
-	plt.title('training curve of {}'.format(env_name))
+	plot_env_name = env_id_2_env_name[env_name]
+	plt.title('{}'.format(plot_env_name))
+	plt.ylabel('Episode Reward')
+	plt.xlabel('Training Steps')
+	ax._fig.subplots_adjust(top=0.9)
+	ax._fig.subplots_adjust(bottom=0.12)
+	plt.legend(loc='best')
 	plt.show()
 	if save_path:
 		plt.savefig(save_path)
@@ -131,6 +151,10 @@ def parse_args():
 							help='plot the training curve of all N-dup experiments for different values of N')
 	parser.add_argument('--plot_semi', default=False, action='store_true',
 							help='plot the training curve of all k-semi-dup experiments for different values of k')
+	parser.add_argument('--plot_random', default=False, action='store_true',
+							help='plot the training curve of all random actions experiments')
+	parser.add_argument('--plot_duplicate', default=False, action='store_true',
+							help='plot the training curve of all experiments comparing DQN with DQN on N-dup')
 	parser.add_argument('--plot_atari', default=False, action='store_true',
 							help='plot the training curve of atari experiments and with help of inverse models')
 	parser.add_argument('--plot_loss', default=False, action='store_true',
@@ -155,33 +179,104 @@ def main():
 	# all data that needs to be plotted
 	# base cases needed by all
 	dirname_to_description = {
-		experiment_dir + "-nodup": "no dup",
-		experiment_dir: "5 dup",
-		experiment_dir + "-oracle": "5 dup with oracle",
+		experiment_dir + "-nodup": "Baseline (1x)",
+		# experiment_dir: "5 dup",
+		# experiment_dir + "-oracle": "5 dup with oracle",
 	}
 	if args.plot_ndup:
+		dirname_to_description[experiment_dir] = "Duplciate (5x)"
+		dirname_to_description[experiment_dir + "-oracle"] = "Duplicate (5x) with oracle"
 		all_values_of_n = [15, 50]
 		for n in all_values_of_n:
-			dirname_to_description[experiment_dir + "-{}dup".format(n)] = "{} dup".format(n)
-			dirname_to_description[experiment_dir + "-{}dup-oracle".format(n)] = "{} dup with oracle".format(n)
+			dirname_to_description[experiment_dir + "-{}dup".format(n)] = "Duplicate ({}x)".format(n)
+			dirname_to_description[experiment_dir + "-{}dup-oracle".format(n)] = "Duplicate ({}x) with oracle".format(n)
 	elif args.plot_semi:
-		all_semi_scores = [0.2, 0.5, 0.8, 0.95, 0.99]
+		all_semi_scores = [0.2, 0.5, 0.8]
 		for k in all_semi_scores:
-			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "{} semi-duplicate".format(k)
-			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "{} semi-duplicate with oracle".format(k)
+			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "{} Semi-duplicate".format(k)
+			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "{} Semi-duplicate with oracle".format(k)
 	elif args.plot_atari:
 		args.suppress_gscore = True  # atari doesn't have gscore
+		games_to_plot = ['breakout', 'pacman', 'space-invaders', 'qbert', 'pong', 'beam-rider']
+		fig, axes = plt.subplots(2, 3, sharex=True)
+		for i, game in enumerate(games_to_plot):
+			# gather data from csv
+			experiment_dir = args.results_dir + game	
+			dirname_to_description = {
+				experiment_dir: "Baseline (1x)",
+				experiment_dir + "-5dup": "Duplicate (5x)",
+				experiment_dir + "-full": "Full action set",
+				experiment_dir + "-more": "Noop (2x)",
+			}
+			data = preprocess_data("training_reward.csv", dirname_to_description)
+			# plot is with subplot
+			sns.lineplot(
+				ax=axes[i // 3, i % 3],
+				data=data,
+				x='training step', y='reward during evaluation callback',
+				hue='agent', style='agent'
+			)
+			axes[i // 3, i % 3].set_title(f"{env_id_2_env_name[game]}")
+			# ylabel
+			if i % 3 == 0:
+				axes[i // 3, i % 3].set_ylabel("Episode Reward")
+			else:
+				axes[i // 3, i % 3].set_ylabel("")
+			axes[i//3, i%3].set_xlabel("Training Steps")
+			# shared legend
+			axes[i // 3, i % 3].get_legend().remove()
+			if i == 5:
+				handles, labels = axes[i // 3, i % 3].get_legend_handles_labels()
+				fig.legend(handles, labels, loc='center right')
+				plt.subplots_adjust(right=0.85)
+		plt.show()
+		plt.close()
+		return
+	elif args.plot_duplicate:
+		args.suppress_gscore = True
+		envs_to_plot = ['cartpole-dqn', 'pendulum-dqn', 'lander-dqn']
+		fig, axes = plt.subplots(1, 3)
+		for i, env in enumerate(envs_to_plot):
+			# gather data from csv
+			experiment_dir = args.results_dir + env
+			dirname_to_description = {
+				experiment_dir + "-nodup": "Baseline (1x)",
+				experiment_dir: "Duplicate (5x)",
+				experiment_dir + "-oracle": "Duplicate (5x) with oracle",
+			}
+			data = preprocess_data("training_reward.csv", dirname_to_description)
+			# plot is with subplot
+			sns.lineplot(
+				ax=axes[i],
+				data=data,
+				x='training step', y='reward during evaluation callback',
+				hue='agent', style='agent'
+			)
+			axes[i].set_title(f"{env_id_2_env_name[env]}")
+			fig.subplots_adjust(bottom=0.12)
+			# ylabel
+			if i == 0:
+				axes[i].set_ylabel("Episode Reward")
+			else:
+				axes[i].set_ylabel("")
+			axes[i].set_xlabel("Training Steps")
+			# shared legend
+			axes[i].get_legend().remove()
+			if i == 2:
+				handles, labels = axes[i].get_legend_handles_labels()
+				fig.legend(handles, labels, loc='center right')
+				plt.subplots_adjust(right=0.80)
+				plt.subplots_adjust(bottom=0.20)
+		plt.show()
+		plt.close()
+		return
+	elif args.plot_random:
 		dirname_to_description = {
-			experiment_dir: "baseline",
-			experiment_dir + "-5dup": "4 sets of duplicate actions",
-			experiment_dir + "-full": "full action set (18 actions)",
-			experiment_dir + "-more-noop": "2 noop action sets",
-			experiment_dir + "-oracle": "similarity oracle",
+			experiment_dir + "-nodup": "Baseline (1x)",
+			experiment_dir + "-rand": "Random actions",
+			experiment_dir + "-rand-oracle": "Random actions with oracle",
 		}
-	else:
-		# default option
-		dirname_to_description[experiment_dir + "-rand"] = "random actions"
-		dirname_to_description[experiment_dir + "-rand-oracle"] = "random actions with oracle"
+
 
 	# plot reward
 	reward_data = preprocess_data("training_reward.csv", dirname_to_description)
