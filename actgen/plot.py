@@ -46,7 +46,15 @@ def preprocess_data(file_ending, dirname_to_description):
 		all_files = iterate_through_directory(dirname, file_ending)
 		if not all_files:
 			continue  # for non-existent directories
-		data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files], ignore_index=True)
+		# only gather 20k steps for pendulum
+		if 'pendulum' in dirname:
+			# TODO:
+			data_frames = [pd.read_csv(fname) for fname in all_files]
+			filtered_data_frames = [df[df['training step'] <= 20000] for df in data_frames]
+			data_in_dir = pd.concat(filtered_data_frames, ignore_index=True)
+			# data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files], ignore_index=True)
+		else:
+			data_in_dir = pd.concat([pd.read_csv(fname) for fname in all_files], ignore_index=True)
 		data_in_dir['agent'] = description
 		accumulated_data.append(data_in_dir)
 	accumulated_data = pd.concat(accumulated_data, ignore_index=True)
@@ -179,22 +187,22 @@ def main():
 	# all data that needs to be plotted
 	# base cases needed by all
 	dirname_to_description = {
-		experiment_dir + "-nodup": "Baseline (1x)",
+		experiment_dir + "-nodup": "1x (baseline)",
 		# experiment_dir: "5 dup",
 		# experiment_dir + "-oracle": "5 dup with oracle",
 	}
 	if args.plot_ndup:
-		dirname_to_description[experiment_dir] = "Duplciate (5x)"
-		dirname_to_description[experiment_dir + "-oracle"] = "Duplicate (5x) with oracle"
+		dirname_to_description[experiment_dir] = "5x"
+		dirname_to_description[experiment_dir + "-oracle"] = "5x (oracle)"
 		all_values_of_n = [15, 50]
 		for n in all_values_of_n:
-			dirname_to_description[experiment_dir + "-{}dup".format(n)] = "Duplicate ({}x)".format(n)
-			dirname_to_description[experiment_dir + "-{}dup-oracle".format(n)] = "Duplicate ({}x) with oracle".format(n)
+			dirname_to_description[experiment_dir + "-{}dup".format(n)] = "{}x".format(n)
+			dirname_to_description[experiment_dir + "-{}dup-oracle".format(n)] = "{}x (oracle)".format(n)
 	elif args.plot_semi:
 		all_semi_scores = [0.2, 0.5, 0.8]
 		for k in all_semi_scores:
-			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "{} Semi-duplicate".format(k)
-			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "{} Semi-duplicate with oracle".format(k)
+			dirname_to_description[experiment_dir + "-semi-{}".format(k)] = "5x, h={}".format(k)
+			dirname_to_description[experiment_dir + "-semi-{}-oracle".format(k)] = "5x, h={} (oracle)".format(k)
 	elif args.plot_atari:
 		args.suppress_gscore = True  # atari doesn't have gscore
 		games_to_plot = ['breakout', 'pacman', 'space-invaders', 'qbert', 'pong', 'beam-rider']
@@ -227,8 +235,8 @@ def main():
 			axes[i // 3, i % 3].get_legend().remove()
 			if i == 5:
 				handles, labels = axes[i // 3, i % 3].get_legend_handles_labels()
-				fig.legend(handles, labels, loc='center right')
-				plt.subplots_adjust(right=0.85)
+				fig.legend(handles, labels, loc='lower center', ncol=4)
+				plt.subplots_adjust(bottom=0.15)
 		plt.show()
 		plt.close()
 		return
@@ -240,9 +248,9 @@ def main():
 			# gather data from csv
 			experiment_dir = args.results_dir + env
 			dirname_to_description = {
-				experiment_dir + "-nodup": "Baseline (1x)",
-				experiment_dir: "Duplicate (5x)",
-				experiment_dir + "-oracle": "Duplicate (5x) with oracle",
+				experiment_dir + "-nodup": "1x (baseline)",
+				experiment_dir: "5x",
+				experiment_dir + "-oracle": "5x (oracle)",
 			}
 			data = preprocess_data("training_reward.csv", dirname_to_description)
 			# plot is with subplot
@@ -264,18 +272,50 @@ def main():
 			axes[i].get_legend().remove()
 			if i == 2:
 				handles, labels = axes[i].get_legend_handles_labels()
-				fig.legend(handles, labels, loc='center right')
-				plt.subplots_adjust(right=0.80)
+				fig.legend(handles, labels, loc='lower center', ncol=4)
 				plt.subplots_adjust(bottom=0.20)
 		plt.show()
 		plt.close()
 		return
 	elif args.plot_random:
-		dirname_to_description = {
-			experiment_dir + "-nodup": "Baseline (1x)",
-			experiment_dir + "-rand": "Random actions",
-			experiment_dir + "-rand-oracle": "Random actions with oracle",
-		}
+
+
+		args.suppress_gscore = True
+		envs_to_plot = ['cartpole-dqn', 'pendulum-dqn', 'lander-dqn']
+		fig, axes = plt.subplots(1, 3)
+		for i, env in enumerate(envs_to_plot):
+			# gather data from csv
+			experiment_dir = args.results_dir + env
+			dirname_to_description = {
+				experiment_dir + "-nodup": "1x (baseline)",
+				experiment_dir + "-rand": "5x",
+				experiment_dir + "-rand-oracle": "5x (oracle)",
+			}
+			data = preprocess_data("training_reward.csv", dirname_to_description)
+			# plot is with subplot
+			sns.lineplot(
+				ax=axes[i],
+				data=data,
+				x='training step', y='reward during evaluation callback',
+				hue='agent', style='agent'
+			)
+			axes[i].set_title(f"{env_id_2_env_name[env]}")
+			fig.subplots_adjust(bottom=0.12)
+			# ylabel
+			if i == 0:
+				axes[i].set_ylabel("Episode Reward")
+			else:
+				axes[i].set_ylabel("")
+			axes[i].set_xlabel("Training Steps")
+			# shared legend
+			axes[i].get_legend().remove()
+			if i == 2:
+				handles, labels = axes[i].get_legend_handles_labels()
+				fig.legend(handles, labels, loc='lower center', ncol=4)
+				plt.subplots_adjust(bottom=0.20)
+		plt.show()
+		plt.close()
+		return
 
 
 	# plot reward
